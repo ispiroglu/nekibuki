@@ -23,11 +23,11 @@ interface SwipeNavigatorProps {}
 
 const SwipeNavigator: React.FC<SwipeNavigatorProps> = () => {
   const pagerRef = useRef<PagerView>(null);
-  const [currentIndex, setCurrentIndex] = useState<number>(1); // Start with camera (middle)
-  const [pagePosition, setPagePosition] = useState<number>(1); // Track exact page position for animations
+  const [currentIndex, setCurrentIndex] = useState<number>(0); // Start with camera (middle)
+  const [pagePosition, setPagePosition] = useState<number>(0); // Track exact page position for animations
   
   // Animated values for smooth transitions
-  const indicatorAnimation = useRef(new Animated.Value(1)).current;
+  const indicatorAnimation = useRef(new Animated.Value(0)).current;
   const pageTransition = useRef(new Animated.Value(0)).current;
 
   const screens = [
@@ -90,20 +90,6 @@ const SwipeNavigator: React.FC<SwipeNavigatorProps> = () => {
     }).start();
   }, [indicatorAnimation]);
 
-  // Calculate animated indicator position with smoother interpolation
-  const indicatorTranslateX = indicatorAnimation.interpolate({
-    inputRange: [0, 1, 2],
-    outputRange: [-24, 0, 24], // Adjusted for better spacing with labels
-    extrapolate: 'clamp',
-  });
-
-  // Add a subtle background animation
-  const backgroundOpacity = pageTransition.interpolate({
-    inputRange: [0, 1, 2],
-    outputRange: [0.05, 0.1, 0.05],
-    extrapolate: 'clamp',
-  });
-
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
@@ -118,58 +104,55 @@ const SwipeNavigator: React.FC<SwipeNavigatorProps> = () => {
           orientation="horizontal"
           scrollEnabled={true}
         >
-          {screens.map((screen, index) => (
-            <View key={index} style={[styles.page, { backgroundColor: screen.color }]}>
-              <Animated.View style={[
-                styles.pageContent,
-                {
-                  opacity: pageTransition.interpolate({
-                    inputRange: [index - 1, index, index + 1],
-                    outputRange: [0.6, 1, 0.6],
-                    extrapolate: 'clamp',
-                  }),
-                  transform: [
-                    {
-                      scale: pageTransition.interpolate({
-                        inputRange: [index - 1, index, index + 1],
-                        outputRange: [0.92, 1, 0.92],
-                        extrapolate: 'clamp',
-                      }),
-                    },
-                    {
-                      translateX: pageTransition.interpolate({
-                        inputRange: [index - 1, index, index + 1],
-                        outputRange: [width * 0.1, 0, -width * 0.1],
-                        extrapolate: 'clamp',
-                      }),
-                    },
-                  ],
-                }
-              ]}>
-                {screen.name === 'Camera' ? (
-                  <CameraScreen isFocused={currentIndex === index} />
-                ) : (
-                  <screen.component />
-                )}
-              </Animated.View>
-            </View>
-          ))}
+          {screens.map((screen, index) => {
+            const isCameraFocused = screen.name === 'Camera' && currentIndex === index;
+    
+            
+            return (
+              <View key={index} style={[styles.page, { backgroundColor: screen.color }]}>
+                <Animated.View style={[
+                  styles.pageContent,
+                  {
+                    opacity: pageTransition.interpolate({
+                      inputRange: [index - 1, index, index + 1],
+                      outputRange: [0.6, 1, 0.6],
+                      extrapolate: 'clamp',
+                    }),
+                    transform: [
+                      {
+                        scale: pageTransition.interpolate({
+                          inputRange: [index - 1, index, index + 1],
+                          outputRange: [0.92, 1, 0.92],
+                          extrapolate: 'clamp',
+                        }),
+                      },
+                      {
+                        translateX: pageTransition.interpolate({
+                          inputRange: [index - 1, index, index + 1],
+                          outputRange: [width * 0.1, 0, -width * 0.1],
+                          extrapolate: 'clamp',
+                        }),
+                      },
+                    ],
+                  }
+                ]}>
+                  {screen.name === 'Camera' ? (
+                    <CameraScreen 
+                      isFocused={isCameraFocused} 
+                      key={`camera-${isCameraFocused ? 'focused' : 'unfocused'}`}
+                    />
+                  ) : (
+                    <screen.component />
+                  )}
+                </Animated.View>
+              </View>
+            );
+          })}
         </PagerView>
 
         {/* Enhanced Navigation with Animations */}
         <View style={styles.compactNav}>
           <View style={styles.dotIndicator}>
-            {/* Animated background indicator */}
-            <Animated.View
-              style={[
-                styles.activeIndicatorBackground,
-                {
-                  transform: [{ translateX: indicatorTranslateX }],
-                },
-                { opacity: backgroundOpacity },
-              ]}
-            />
-            
             {screens.map((screen, index) => (
               <TouchableOpacity
                 key={index}
@@ -192,23 +175,6 @@ const SwipeNavigator: React.FC<SwipeNavigatorProps> = () => {
                     }
                   ]}
                 />
-                
-                {/* Screen name labels */}
-                <Animated.Text
-                  style={[
-                    styles.screenLabel,
-                    {
-                      opacity: indicatorAnimation.interpolate({
-                        inputRange: [index - 0.5, index, index + 0.5],
-                        outputRange: [0.5, 1, 0.5],
-                        extrapolate: 'clamp',
-                      }),
-                      color: currentIndex === index ? Colors.buttonPrimary : Colors.textTertiary,
-                    }
-                  ]}
-                >
-                  {screen.name}
-                </Animated.Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -238,42 +204,23 @@ const styles = StyleSheet.create({
   },
   compactNav: {
     alignItems: 'center',
-    paddingVertical: Spacing.md,
-    backgroundColor: Colors.background,
-    borderTopWidth: 0.5,
-    borderTopColor: Colors.borderLight,
-    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.xs,
+    backgroundColor: '#FCF7FA',
   },
   dotIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    position: 'relative',
   },
   dotContainer: {
     alignItems: 'center',
-    padding: Spacing.md,
-    minWidth: 60,
+    padding: Spacing.xs,
   },
   dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     marginHorizontal: 4,
-  },
-  activeIndicatorBackground: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: `${Colors.buttonPrimary}15`,
-    position: 'absolute',
-    top: 8,
-  },
-  screenLabel: {
-    marginTop: Spacing.xs,
-    fontSize: 12,
-    fontWeight: '500',
-    textAlign: 'center',
   },
 });
 

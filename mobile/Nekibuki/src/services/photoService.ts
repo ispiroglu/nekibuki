@@ -104,12 +104,21 @@ class PhotoService {
    */
   async pollForAnalysisResult(
     sessionId: string,
-    onProgress?: (status: string, attempt: number) => void
+    onProgress?: (status: string, attempt: number) => void,
+    abortSignal?: AbortSignal
   ): Promise<ApiResponse<RecognitionResult>> {
     let attempt = 0;
     
     while (attempt < this.MAX_POLLING_ATTEMPTS) {
       attempt++;
+      
+      // Check if cancellation was requested
+      if (abortSignal?.aborted) {
+        return {
+          success: false,
+          error: 'Analysis cancelled by user',
+        };
+      }
       
       try {
         onProgress?.(`Checking analysis status... (${attempt}/${this.MAX_POLLING_ATTEMPTS})`, attempt);
@@ -136,12 +145,41 @@ class PhotoService {
           // If status is 'pending' or 'processing', continue polling
         }
         
-        // Wait before next attempt
+        // Wait before next attempt (with cancellation support)
         if (attempt < this.MAX_POLLING_ATTEMPTS) {
-          await new Promise(resolve => setTimeout(resolve, this.POLLING_INTERVAL));
+          await new Promise<void>((resolve, reject) => {
+            const timeoutId = setTimeout(resolve, this.POLLING_INTERVAL);
+            
+            if (abortSignal) {
+              const abortHandler = () => {
+                clearTimeout(timeoutId);
+              };
+              
+              if (abortSignal.aborted) {
+                clearTimeout(timeoutId);
+
+              } else {
+                abortSignal.addEventListener('abort', abortHandler);
+                
+                // Clean up listener when timeout completes
+                setTimeout(() => {
+                  abortSignal.removeEventListener('abort', abortHandler);
+                }, this.POLLING_INTERVAL);
+              }
+            }
+          });
         }
       } catch (error) {
         console.error('Polling error:', error);
+        
+        // Check if error is due to cancellation
+        if (error instanceof Error && error.message === 'Analysis cancelled by user') {
+          return {
+            success: false,
+            error: 'Analysis cancelled by user',
+          };
+        }
+        
         if (attempt === this.MAX_POLLING_ATTEMPTS) {
           return {
             success: false,
@@ -165,9 +203,18 @@ class PhotoService {
   async uploadPhotoAndWaitForAnalysis(
     photoUri: string,
     onUploadProgress?: (progress: UploadProgress) => void,
-    onAnalysisProgress?: (status: string, attempt: number) => void
+    onAnalysisProgress?: (status: string, attempt: number) => void,
+    abortSignal?: AbortSignal
   ): Promise<ApiResponse<RecognitionResult>> {
     try {
+      // Check if cancellation was requested before starting
+      if (abortSignal?.aborted) {
+        return {
+          success: false,
+          error: 'Analysis cancelled by user',
+        };
+      }
+
       // Step 1: Upload photo with progress tracking if callback provided
       const uploadResponse = await this.uploadPhoto(photoUri, onUploadProgress);
       
@@ -180,8 +227,8 @@ class PhotoService {
       
       const sessionId = uploadResponse.data.session_id;
       
-      // Step 2: Poll for results
-      const analysisResponse = await this.pollForAnalysisResult(sessionId, onAnalysisProgress);
+      // Step 2: Poll for results with cancellation support
+      const analysisResponse = await this.pollForAnalysisResult(sessionId, onAnalysisProgress, abortSignal);
       
       return analysisResponse;
     } catch (error) {

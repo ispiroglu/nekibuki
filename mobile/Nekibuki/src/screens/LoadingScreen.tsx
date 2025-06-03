@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,14 +20,25 @@ const LoadingScreen: React.FC = () => {
   
   const [progress, setProgress] = useState(0);
   const [currentStatus, setCurrentStatus] = useState('Identifying landmarks');
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     // Start the analysis process
     analyzePhoto();
+    
+    // Cleanup function to cancel analysis when component unmounts
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, []);
 
   const analyzePhoto = async () => {
     try {
+      // Create a new AbortController for this analysis
+      abortControllerRef.current = new AbortController();
+      
       const response = await PhotoService.uploadPhotoAndWaitForAnalysis(
         imageUri,
         (progress) => {
@@ -35,24 +46,40 @@ const LoadingScreen: React.FC = () => {
         },
         (status, attempt) => {
           setCurrentStatus(status);
-        }
+        },
+        abortControllerRef.current.signal
       );
 
       if (response.success && response.data) {
         // Navigate to result screen
         navigation.replace('Result', { result: response.data, imageUri });
       } else {
+        // Check if the error is due to cancellation
+        if (response.error === 'Analysis cancelled by user') {
+          // Don't show error for user cancellation
+          return;
+        }
         throw new Error(response.error || 'Analysis failed');
       }
     } catch (error) {
+      // Check if the error is due to cancellation first
+      if (error instanceof Error && error.message === 'Analysis cancelled by user') {
+        return;
+      }
+      
+      // Only log actual errors, not cancellations
       console.error('Analysis error:', error);
       // Navigate back to main screen on error
-      navigation.goBack();
+      navigation.navigate('Main');
     }
   };
 
   const handleCancel = () => {
-    navigation.goBack();
+    // Cancel the ongoing analysis
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    navigation.navigate('Main');
   };
 
   useEffect(() => {
@@ -77,7 +104,7 @@ const LoadingScreen: React.FC = () => {
         
         return newProgress;
       });
-    }, 100);
+    }, 120);
 
     return () => clearInterval(interval);
   }, []);
