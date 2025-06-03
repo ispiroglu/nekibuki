@@ -1,616 +1,636 @@
-# Nekibuki Backend Development Plan
+# Nekibuki Backend Plan - MVP
 
 ## Overview
-This plan focuses exclusively on the backend development for Nekibuki - a mobile application that provides instant, detailed explanations of tourist attractions through photo recognition. The backend will handle image processing, AI-powered content generation, user management, and serve APIs to mobile clients.
+This document outlines the backend architecture for Nekibuki MVP, focusing on core image recognition functionality with type-safe database operations using sqlc.
 
-**Backend Tech Stack:**
-- **Runtime**: Go (latest stable version)
-- **Database**: PostgreSQL with connection pooling
-- **Authentication**: Google OAuth + JWT
-- **AI Service**: Google Gemini Flash LLM
-- **Image Recognition**: Google Vision API
-- **API**: RESTful with JSON responses
-- **Deployment**: VPS with Coolify
-- **Caching**: Redis (for session and content caching)
-- **File Storage**: Local filesystem with future S3 compatibility
+**MVP Tech Stack:**
+- **Language**: Go 1.22+ (enhanced HTTP routing)
+- **Database**: PostgreSQL with sqlc for type-safe queries
+- **Image Recognition + Content Generation**: Google Gemini Flash 2.0-lite (multimodal)
+- **HTTP Routing**: Standard Go 1.22+ HTTP patterns
+- **File Storage**: Local filesystem (MVP), S3-compatible for production
 
-## 1. Project Foundation & Setup
+**Future Enhancements (Post-MVP):**
+- **Authentication**: Google OAuth 2.0 + JWT (notes kept below)
 
-### 1.1 Go Project Structure
-```
-backend/
-├── cmd/
-│   └── server/
-│       └── main.go                 # Application entry point
-├── internal/
-│   ├── auth/                       # Authentication logic
-│   ├── config/                     # Configuration management
-│   ├── database/                   # Database connection and models
-│   ├── handlers/                   # HTTP handlers
-│   ├── middleware/                 # HTTP middleware
-│   ├── services/                   # Business logic services
-│   └── utils/                      # Utility functions
-├── pkg/
-│   ├── models/                     # Data models and structs
-│   └── api/                        # API response structures
-├── migrations/                     # Database migration files
-├── scripts/                        # Deployment and utility scripts
-├── docker/                         # Docker configurations
-├── docs/                          # API documentation
-├── go.mod
-├── go.sum
-├── .env.example
-└── README.md
-```
+## Database Schema Design
 
-### 1.2 Dependencies and Modules
-- [ ] Initialize Go modules with `go mod init`
-- [ ] Core dependencies:
-  ```go
+### Core Tables (MVP)
 
-  
-  // Database
-  github.com/lib/pq              // PostgreSQL driver
-  github.com/jmoiron/sqlx        // SQL extensions
-  github.com/golang-migrate/migrate // Database migrations
-  
-  // Authentication
-  github.com/dgrijalva/jwt-go    // JWT handling
-  golang.org/x/oauth2           // OAuth2 client
-  
-  // External APIs
-  google.golang.org/api/vision/v1    // Google Vision API
-  cloud.google.com/go/aiplatform     // Google Gemini API
-  
-  // Utilities
-  github.com/joho/godotenv       // Environment variables
-  github.com/sirupsen/logrus     // Structured logging
-  github.com/go-redis/redis/v8   // Redis client
-  github.com/google/uuid         // UUID generation
-  ```
-
-### 1.3 Environment Configuration
-- [ ] Create configuration management system
-  ```go
-  type Config struct {
-      Server struct {
-          Port        string
-          Environment string
-          LogLevel    string
-      }
-      Database struct {
-          Host     string
-          Port     string
-          Name     string
-          User     string
-          Password string
-          SSLMode  string
-      }
-      Google struct {
-          OAuth struct {
-              ClientID     string
-              ClientSecret string
-              RedirectURL  string
-          }
-          VisionAPIKey string
-          GeminiAPIKey string
-      }
-      JWT struct {
-          SecretKey      string
-          ExpirationTime time.Duration
-      }
-      Redis struct {
-          Host     string
-          Port     string
-          Password string
-          DB       int
-      }
-  }
-  ```
-
-- [ ] Environment-specific configurations (dev, staging, prod)
-- [ ] Secure secrets management with environment variables
-- [ ] Configuration validation on startup
-
-## 2. Database Architecture & Setup
-
-### 2.1 Database Schema Design
 ```sql
--- Users table
+-- Recognition sessions for photo processing workflow (simplified for MVP)
+CREATE TABLE recognition_sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    
+    -- Image metadata
+    image_path VARCHAR(500),
+    image_hash VARCHAR(64), -- For duplicate detection
+    
+    -- Recognition and content results (both from Gemini Flash 2.0-lite)
+    gemini_response JSONB, -- Raw Gemini response with image analysis
+    primary_attraction VARCHAR(500), -- Main identified attraction
+    confidence_score DECIMAL(3,2), -- Gemini confidence
+    attraction_info JSONB, -- Structured attraction information
+    
+    -- Processing metadata
+    status VARCHAR(50) DEFAULT 'processing', -- processing, completed, failed, timeout
+    error_message TEXT,
+    processing_started_at TIMESTAMP DEFAULT NOW(),
+    processing_completed_at TIMESTAMP,
+    
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Indexes for performance
+CREATE INDEX idx_recognition_sessions_status ON recognition_sessions(status);
+CREATE INDEX idx_recognition_sessions_image_hash ON recognition_sessions(image_hash);
+CREATE INDEX idx_recognition_sessions_created_at ON recognition_sessions(created_at);
+
+-- Future: Users table for authentication (kept for reference)
+/*
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     google_id VARCHAR(255) UNIQUE NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
+    email VARCHAR(255) NOT NULL,
     name VARCHAR(255) NOT NULL,
-    profile_picture_url TEXT,
-    language_preference VARCHAR(10) DEFAULT 'en',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    last_login TIMESTAMP WITH TIME ZONE
+    profile_picture TEXT,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- Tourist attractions master data
-CREATE TABLE attractions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(500) NOT NULL,
-    description TEXT,
-    location_coordinates POINT,
-    country VARCHAR(100),
-    city VARCHAR(100),
-    category VARCHAR(100),
-    official_website TEXT,
-    wikipedia_url TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Photo recognition history
-CREATE TABLE recognition_sessions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    original_image_path TEXT NOT NULL,
-    processed_image_path TEXT,
-    recognition_confidence DECIMAL(5,4),
-    recognized_attraction_id UUID REFERENCES attractions(id),
-    custom_attraction_name VARCHAR(500),
-    generated_content TEXT,
-    processing_duration_ms INTEGER,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- User sessions for authentication
-CREATE TABLE user_sessions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    session_token VARCHAR(255) UNIQUE NOT NULL,
-    refresh_token VARCHAR(255),
-    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    last_accessed TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Analytics and metrics
-CREATE TABLE api_usage_logs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES users(id),
-    endpoint VARCHAR(255) NOT NULL,
-    method VARCHAR(10) NOT NULL,
-    status_code INTEGER NOT NULL,
-    response_time_ms INTEGER,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Content cache for frequently requested attractions
-CREATE TABLE content_cache (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    attraction_name VARCHAR(500) NOT NULL,
-    content_hash VARCHAR(64) UNIQUE NOT NULL,
-    generated_content TEXT NOT NULL,
-    language VARCHAR(10) DEFAULT 'en',
-    cache_hits INTEGER DEFAULT 0,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    last_accessed TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+-- Add user_id column to recognition_sessions when auth is implemented
+-- ALTER TABLE recognition_sessions ADD COLUMN user_id UUID REFERENCES users(id) ON DELETE CASCADE;
+-- CREATE INDEX idx_recognition_sessions_user_id ON recognition_sessions(user_id);
+-- CREATE INDEX idx_users_google_id ON users(google_id);
+*/
 ```
 
-### 2.2 Database Operations
-- [ ] PostgreSQL connection setup with connection pooling
-- [ ] Database migration system implementation
-- [ ] CRUD operations for each table
-- [ ] Database indexes for performance optimization:
-  ```sql
-  CREATE INDEX idx_users_google_id ON users(google_id);
-  CREATE INDEX idx_recognition_sessions_user_id ON recognition_sessions(user_id);
-  CREATE INDEX idx_recognition_sessions_created_at ON recognition_sessions(created_at);
-  CREATE INDEX idx_attractions_location ON attractions USING GIST(location_coordinates);
-  CREATE INDEX idx_content_cache_hash ON content_cache(content_hash);
-  ```
+## sqlc Configuration
 
-### 2.3 Database Models (Go Structs)
+### sqlc.yaml
+```yaml
+version: "2"
+sql:
+  - engine: "postgresql"
+    queries: "queries"
+    schema: "migrations"
+    gen:
+      go:
+        package: "database"
+        out: "internal/database"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: true
+        emit_exact_table_names: true
+```
+
+### Database Queries Structure
+
+```
+queries/
+└── sessions.sql       # Recognition session queries (simplified)
+```
+
+#### queries/sessions.sql
+```sql
+-- name: CreateRecognitionSession :one
+INSERT INTO recognition_sessions (image_path, image_hash)
+VALUES ($1, $2)
+RETURNING *;
+
+-- name: GetRecognitionSession :one
+SELECT * FROM recognition_sessions WHERE id = $1;
+
+-- name: UpdateSessionWithResults :exec
+UPDATE recognition_sessions 
+SET gemini_response = $2,
+    primary_attraction = $3,
+    confidence_score = $4,
+    attraction_info = $5,
+    status = $6,
+    processing_completed_at = NOW()
+WHERE id = $1;
+
+-- name: UpdateSessionError :exec
+UPDATE recognition_sessions 
+SET status = 'failed',
+    error_message = $2,
+    processing_completed_at = NOW()
+WHERE id = $1;
+
+-- name: GetRecentSessions :many
+SELECT * FROM recognition_sessions 
+ORDER BY created_at DESC 
+LIMIT $1;
+
+-- Future: User-related queries (kept for reference)
+/*
+-- name: GetUserByGoogleID :one
+SELECT * FROM users WHERE google_id = $1;
+
+-- name: CreateUser :one
+INSERT INTO users (google_id, email, name, profile_picture)
+VALUES ($1, $2, $3, $4)
+RETURNING *;
+
+-- name: GetUserSessions :many
+SELECT * FROM recognition_sessions 
+WHERE user_id = $1 
+ORDER BY created_at DESC 
+LIMIT $2;
+*/
+```
+
+## Data Models
+
+### Database Models (Generated by sqlc)
 ```go
-type User struct {
-    ID                   string    `db:"id" json:"id"`
-    GoogleID            string    `db:"google_id" json:"google_id"`
-    Email               string    `db:"email" json:"email"`
-    Name                string    `db:"name" json:"name"`
-    ProfilePictureURL   *string   `db:"profile_picture_url" json:"profile_picture_url"`
-    LanguagePreference  string    `db:"language_preference" json:"language_preference"`
-    CreatedAt           time.Time `db:"created_at" json:"created_at"`
-    UpdatedAt           time.Time `db:"updated_at" json:"updated_at"`
-    LastLogin           *time.Time `db:"last_login" json:"last_login"`
-}
-
-type Attraction struct {
-    ID                  string     `db:"id" json:"id"`
-    Name                string     `db:"name" json:"name"`
-    Description         *string    `db:"description" json:"description"`
-    LocationCoordinates *string    `db:"location_coordinates" json:"location_coordinates"`
-    Country             *string    `db:"country" json:"country"`
-    City                *string    `db:"city" json:"city"`
-    Category            *string    `db:"category" json:"category"`
-    OfficialWebsite     *string    `db:"official_website" json:"official_website"`
-    WikipediaURL        *string    `db:"wikipedia_url" json:"wikipedia_url"`
-    CreatedAt           time.Time  `db:"created_at" json:"created_at"`
-    UpdatedAt           time.Time  `db:"updated_at" json:"updated_at"`
-}
-
+// Generated by sqlc
 type RecognitionSession struct {
-    ID                      string    `db:"id" json:"id"`
-    UserID                  string    `db:"user_id" json:"user_id"`
-    OriginalImagePath       string    `db:"original_image_path" json:"original_image_path"`
-    ProcessedImagePath      *string   `db:"processed_image_path" json:"processed_image_path"`
-    RecognitionConfidence   *float64  `db:"recognition_confidence" json:"recognition_confidence"`
-    RecognizedAttractionID  *string   `db:"recognized_attraction_id" json:"recognized_attraction_id"`
-    CustomAttractionName    *string   `db:"custom_attraction_name" json:"custom_attraction_name"`
-    GeneratedContent        *string   `db:"generated_content" json:"generated_content"`
-    ProcessingDurationMs    *int      `db:"processing_duration_ms" json:"processing_duration_ms"`
-    CreatedAt               time.Time `db:"created_at" json:"created_at"`
+    ID                      uuid.UUID       `json:"id"`
+    ImagePath               *string         `json:"image_path"`
+    ImageHash               *string         `json:"image_hash"`
+    GeminiResponse          json.RawMessage `json:"gemini_response"`
+    PrimaryAttraction       *string         `json:"primary_attraction"`
+    ConfidenceScore         *decimal.Decimal `json:"confidence_score"`
+    AttractionInfo          json.RawMessage `json:"attraction_info"`
+    Status                  string          `json:"status"`
+    ErrorMessage            *string         `json:"error_message"`
+    ProcessingStartedAt     time.Time       `json:"processing_started_at"`
+    ProcessingCompletedAt   *time.Time      `json:"processing_completed_at"`
+    CreatedAt               time.Time       `json:"created_at"`
+}
+
+// Future: User model for authentication (kept for reference)
+/*
+type User struct {
+    ID             uuid.UUID  `json:"id"`
+    GoogleID       string     `json:"google_id"`
+    Email          string     `json:"email"`
+    Name           string     `json:"name"`
+    ProfilePicture *string    `json:"profile_picture"`
+    CreatedAt      time.Time  `json:"created_at"`
+    UpdatedAt      time.Time  `json:"updated_at"`
+}
+*/
+```
+
+### API Request Models
+```go
+// Photo upload request (multipart form)
+type UploadPhotoRequest struct {
+    Photo *multipart.FileHeader `form:"photo" binding:"required"`
+}
+
+// Future: Auth models (kept for reference)
+/*
+type OAuthCallbackRequest struct {
+    Code  string `json:"code" binding:"required"`
+    State string `json:"state" binding:"required"`
+}
+*/
+```
+
+### API Response Models
+```go
+// Recognition response (immediate response after upload)
+type RecognitionResponse struct {
+    SessionID string `json:"session_id"`
+    Status    string `json:"status"`
+    Message   string `json:"message"`
+}
+
+// Recognition result (when processing is complete)
+type RecognitionResult struct {
+    SessionID         string           `json:"session_id"`
+    Status            string           `json:"status"`
+    AttractionInfo    *AttractionInfo  `json:"attraction_info,omitempty"`
+    Error             *ErrorDetail     `json:"error,omitempty"`
+    ProcessingTime    *int64           `json:"processing_time_ms,omitempty"`
+}
+
+// Structured attraction information from Gemini Flash 2.0-lite
+type AttractionInfo struct {
+    Name           string   `json:"name"`
+    Description    string   `json:"description"`
+    HistoricalInfo string   `json:"historical_info"`
+    Significance   string   `json:"significance"`
+    InterestingFacts []string `json:"interesting_facts"`
+    Location       *LocationInfo `json:"location,omitempty"`
+    Confidence     float64  `json:"confidence"`
+}
+
+type LocationInfo struct {
+    Country string `json:"country,omitempty"`
+    City    string `json:"city,omitempty"`
+    Region  string `json:"region,omitempty"`
+}
+
+// Consistent error response
+type ErrorResponse struct {
+    Error   ErrorDetail `json:"error"`
+    TraceID string      `json:"trace_id,omitempty"`
+}
+
+type ErrorDetail struct {
+    Code    string `json:"code"`
+    Message string `json:"message"`
+    Details string `json:"details,omitempty"`
+}
+
+// Future: Auth response models (kept for reference)
+/*
+type AuthResponse struct {
+    Token string    `json:"token"`
+    User  UserInfo  `json:"user"`
+}
+
+type UserInfo struct {
+    ID             string `json:"id"`
+    Email          string `json:"email"`
+    Name           string `json:"name"`
+    ProfilePicture string `json:"profile_picture,omitempty"`
+}
+*/
+```
+
+### Internal Service Models
+```go
+// Gemini Flash 2.0-lite multimodal request
+type GeminiMultimodalRequest struct {
+    ImageData      []byte `json:"image_data"`
+    PromptText     string `json:"prompt_text"`
+    ResponseFormat string `json:"response_format"`
+}
+
+// Gemini Flash 2.0-lite response
+type GeminiMultimodalResponse struct {
+    Content       string    `json:"content"`
+    Confidence    float64   `json:"confidence"`
+    DetectedItems []string  `json:"detected_items"`
+    Metadata      map[string]interface{} `json:"metadata"`
+    Generated     time.Time `json:"generated"`
+}
+
+// Processing status enum
+type ProcessingStatus string
+
+const (
+    StatusProcessing ProcessingStatus = "processing"
+    StatusCompleted  ProcessingStatus = "completed"
+    StatusFailed     ProcessingStatus = "failed"
+    StatusTimeout    ProcessingStatus = "timeout"
+)
+```
+
+## MVP API Endpoints (Simplified - No Auth)
+
+### Route Registration (Go 1.22+ patterns)
+```go
+func RegisterRoutes(mux *http.ServeMux, handlers *Handlers, middleware *Middleware) {
+    // Core recognition routes (MVP focus - no auth required)
+    mux.HandleFunc("POST /api/recognize", handlers.RecognizePhoto)
+    mux.HandleFunc("GET /api/recognize/{sessionId}", handlers.GetRecognitionResult)
+    
+    // System routes
+    mux.HandleFunc("GET /api/health", handlers.HealthCheck)
+    
+    // Future: Authentication routes (kept for reference)
+    /*
+    mux.HandleFunc("GET /api/auth/google", handlers.GoogleOAuthRedirect)
+    mux.HandleFunc("GET /api/auth/google/callback", handlers.GoogleOAuthCallback)
+    */
 }
 ```
 
-## 3. Authentication & Security
+### Endpoint Specifications
 
-### 3.1 Google OAuth Implementation
-- [ ] Google OAuth2 client configuration
-- [ ] OAuth flow endpoints:
-  ```go
-  // OAuth endpoints
-  GET  /auth/google           // Redirect to Google OAuth
-  GET  /auth/google/callback  // Handle OAuth callback
-  POST /auth/refresh          // Refresh JWT token
-  POST /auth/logout           // Invalidate session
-  ```
+#### POST /api/recognize
+**Purpose**: Upload photo and start recognition process
 
-- [ ] User profile extraction from Google
-- [ ] Account creation/login logic
-- [ ] OAuth error handling and edge cases
+**Request**:
+- Method: POST
+- Content-Type: multipart/form-data
+- Body: photo file (max 10MB, JPEG/PNG/WebP)
+- No authentication required (MVP)
 
-### 3.2 JWT Token Management
-- [ ] JWT token generation with user claims
-- [ ] Token validation middleware
-- [ ] Refresh token mechanism
-- [ ] Token expiration handling
-- [ ] Secure token storage recommendations for mobile clients
+**Response (202 Accepted)**:
+```json
+{
+    "session_id": "550e8400-e29b-41d4-a716-446655440000",
+    "status": "processing",
+    "message": "Photo uploaded successfully. Processing in progress."
+}
+```
 
-### 3.3 Security Middleware
-- [ ] Authentication middleware for protected routes
-- [ ] CORS configuration for mobile clients
-- [ ] Rate limiting middleware:
-  ```go
-  // Rate limiting rules
-  - /api/auth/*: 10 requests per minute per IP
-  - /api/recognize: 20 requests per hour per user
-  - /api/*: 100 requests per minute per user
-  ```
-- [ ] Request logging and monitoring
+#### GET /api/recognize/{sessionId}
+**Purpose**: Get recognition results
+
+**Response (200 OK - Completed)**:
+```json
+{
+    "session_id": "550e8400-e29b-41d4-a716-446655440000",
+    "status": "completed",
+    "attraction_info": {
+        "name": "Eiffel Tower",
+        "description": "Iron lattice tower in Paris, France",
+        "historical_info": "Constructed from 1887 to 1889...",
+        "significance": "Symbol of France and engineering marvel...",
+        "interesting_facts": [
+            "The tower grows 6 inches in summer due to thermal expansion",
+            "It was initially intended to be temporary"
+        ],
+        "location": {
+            "country": "France",
+            "city": "Paris",
+            "region": "Île-de-France"
+        },
+        "confidence": 0.95
+    },
+    "processing_time_ms": 3240
+}
+```
+
+**Response (202 Accepted - Still Processing)**:
+```json
+{
+    "session_id": "550e8400-e29b-41d4-a716-446655440000",
+    "status": "processing"
+}
+```
+
+**Response (400 Bad Request - Failed)**:
+```json
+{
+    "session_id": "550e8400-e29b-41d4-a716-446655440000",
+    "status": "failed",
+    "error": {
+        "code": "RECOGNITION_FAILED",
+        "message": "Unable to identify any landmarks in the photo",
+        "details": "Try taking a clearer photo with better lighting"
+    }
+}
+```
+
+## Project Structure (Simplified for MVP)
+
+```
+nekibuki-backend/
+├── cmd/api/
+│   └── main.go                    # Application entry point
+├── internal/
+│   ├── config/
+│   │   └── config.go              # Environment configuration
+│   ├── database/
+│   │   ├── connection.go          # Database connection setup
+│   │   ├── models.go              # Generated by sqlc
+│   │   └── querier.go             # Generated by sqlc
+│   ├── handlers/
+│   │   ├── recognition.go         # Recognition endpoints
+│   │   └── health.go              # Health check
+│   ├── middleware/
+│   │   ├── cors.go                # CORS handling
+│   │   ├── logging.go             # Request logging
+│   │   ├── ratelimit.go          # Rate limiting
+│   │   └── recovery.go           # Panic recovery
+│   ├── services/
+│   │   ├── gemini/
+│   │   │   └── client.go          # Google Gemini Flash 2.0-lite
+│   │   └── recognition/
+│   │       └── processor.go      # Main recognition logic
+│   ├── storage/
+│   │   ├── image.go               # Image file handling
+│   │   └── local.go               # Local file storage
+│   └── utils/
+│       ├── errors.go              # Error handling utilities
+│       ├── validation.go          # Input validation
+│       └── crypto.go              # Crypto utilities
+├── migrations/
+│   ├── 001_initial_schema.up.sql # Database schema
+│   └── 001_initial_schema.down.sql
+├── queries/                       # sqlc SQL queries
+│   └── sessions.sql
+├── sqlc.yaml                     # sqlc configuration
+├── config/
+│   ├── development.env
+│   └── production.env
+└── scripts/
+    ├── setup.sh
+    ├── migrate.sh
+    └── generate.sh               # Run sqlc generate
+
+# Future: Auth-related files (kept for reference)
+# ├── internal/auth/              # JWT and OAuth (future)
+# ├── queries/users.sql           # User queries (future)
+```
+
+## External Service Integration
+
+### Google Gemini Flash 2.0-lite Integration (Multimodal)
+```go
+type GeminiService struct {
+    client *genai.Client
+    model  *genai.GenerativeModel
+}
+
+func (g *GeminiService) AnalyzeImageAndGenerateInfo(ctx context.Context, imageData []byte) (*AttractionInfo, error) {
+    // Convert image to base64 for Gemini
+    imageBase64 := base64.StdEncoding.EncodeToString(imageData)
+    
+    // Create multimodal prompt for both recognition and content generation
+    prompt := `
+    Analyze this image and identify any tourist attractions, landmarks, or notable locations.
+    
+    If you can identify a tourist attraction or landmark in the image:
+    1. Provide detailed information about it
+    2. Be confident only if you can clearly identify the location
+    
+    Respond in JSON format with these exact fields:
+    {
+        "name": "Full name of the attraction",
+        "description": "Brief description (2-3 sentences)",
+        "historical_info": "Historical background (1 paragraph)",
+        "significance": "Cultural/historical significance (1 paragraph)",
+        "interesting_facts": ["fact1", "fact2", "fact3"],
+        "location": {
+            "country": "Country name",
+            "city": "City name", 
+            "region": "Region/state name"
+        },
+        "confidence": 0.95
+    }
+    
+    If you cannot identify any specific tourist attraction or landmark, respond with:
+    {
+        "error": "No recognizable tourist attraction found",
+        "confidence": 0.0
+    }
+    
+    Focus on factual, engaging information suitable for tourists.
+    `
+    
+    // Create parts for multimodal input
+    parts := []genai.Part{
+        genai.Text(prompt),
+        genai.ImageData("image/jpeg", imageData),
+    }
+    
+    // Generate content
+    resp, err := g.model.GenerateContent(ctx, parts...)
+    if err != nil {
+        return nil, fmt.Errorf("failed to generate content: %w", err)
+    }
+    
+    // Extract and parse JSON response
+    var attractionInfo AttractionInfo
+    if err := json.Unmarshal([]byte(resp.Candidates[0].Content.Parts[0]), &attractionInfo); err != nil {
+        return nil, fmt.Errorf("failed to parse response: %w", err)
+    }
+    
+    return &attractionInfo, nil
+}
+```
+
+## Processing Workflow (Simplified)
+
+### Core Recognition Flow
+```go
+func (s *RecognitionService) ProcessPhoto(ctx context.Context, imageData []byte) (*RecognitionResponse, error) {
+    // 1. Create session (no user_id for MVP)
+    imagePath := s.saveImage(imageData)
+    imageHash := s.hashImage(imageData)
+    
+    session, err := s.db.CreateRecognitionSession(ctx, CreateRecognitionSessionParams{
+        ImagePath: &imagePath,
+        ImageHash: &imageHash,
+    })
+    if err != nil {
+        return nil, fmt.Errorf("failed to create session: %w", err)
+    }
+    
+    // 2. Process asynchronously
+    go s.processInBackground(context.Background(), session.ID, imageData)
+    
+    // 3. Return immediate response
+    return &RecognitionResponse{
+        SessionID: session.ID.String(),
+        Status:    "processing",
+        Message:   "Photo uploaded successfully. Processing in progress.",
+    }, nil
+}
+
+func (s *RecognitionService) processInBackground(ctx context.Context, sessionID uuid.UUID, imageData []byte) {
+    // Use Gemini Flash 2.0-lite for both image recognition AND content generation
+    attractionInfo, err := s.geminiService.AnalyzeImageAndGenerateInfo(ctx, imageData)
+    if err != nil {
+        s.db.UpdateSessionError(ctx, sessionID, err.Error())
+        return
+    }
+    
+    // Check if attraction was found
+    if attractionInfo.Confidence > 0.5 {
+        // Success - update session with results
+        err = s.db.UpdateSessionWithResults(ctx, UpdateSessionWithResultsParams{
+            ID:                sessionID,
+            GeminiResponse:    marshal(attractionInfo),
+            PrimaryAttraction: &attractionInfo.Name,
+            ConfidenceScore:   &attractionInfo.Confidence,
+            AttractionInfo:    marshal(attractionInfo),
+            Status:            "completed",
+        })
+        if err != nil {
+            log.Printf("Failed to update session %s: %v", sessionID, err)
+        }
+    } else {
+        // No attraction found
+        s.db.UpdateSessionError(ctx, sessionID, "No recognizable tourist attraction found in image")
+    }
+}
+```
+
+## Implementation Phases (Simplified)
+
+### Phase 1: Foundation (3-4 days)
+- [ ] Database schema and migrations (simplified, no users table)
+- [ ] sqlc setup and query generation
+- [ ] Basic HTTP server with middleware
+- [ ] Configuration management
+- [ ] Health check endpoint
+
+### Phase 2: Core Recognition (1.5 weeks)
+- [ ] Photo upload handling
+- [ ] Google Gemini Flash 2.0-lite integration (multimodal)
+- [ ] Background processing workflow
+- [ ] Recognition result retrieval
+- [ ] Error handling for edge cases
+
+### Phase 3: Polish & Testing (3-4 days)
 - [ ] Input validation and sanitization
-- [ ] SQL injection prevention
+- [ ] Performance optimization
+- [ ] Integration testing
+- [ ] Documentation
 
-## 4. External API Integration
+### Phase 4: Future Auth Planning (Optional)
+- [ ] Document authentication integration plan
+- [ ] Prepare migration scripts for adding user management
 
-### 4.1 Google Vision API Integration
-- [ ] Vision API client setup and authentication
-- [ ] Image analysis service:
-  ```go
-  type VisionService struct {
-      client *vision.ImageAnnotatorClient
-  }
-  
-  func (v *VisionService) AnalyzeImage(imageData []byte) (*VisionResult, error) {
-      // Landmark detection
-      // Object detection
-      // Text extraction (OCR)
-      // Safe search detection
-  }
-  ```
+**Total MVP Timeline: 2-3 weeks** (reduced due to simplified scope)
 
-- [ ] Landmark and object detection
-- [ ] Confidence scoring and filtering
-- [ ] Error handling for API failures
-- [ ] Response caching for cost optimization
+## Success Criteria
 
-### 4.2 Google Gemini Flash Integration
-- [ ] Gemini API client setup
-- [ ] Content generation service:
-  ```go
-  type ContentService struct {
-      geminiClient *aiplatform.Client
-  }
-  
-  func (c *ContentService) GenerateAttractionInfo(attractionName string, context string) (*GeneratedContent, error) {
-      // Prompt engineering for consistent responses
-      // Content formatting and structure
-      // Language-specific generation
-      // Quality validation
-  }
-  ```
+### Technical Metrics
+- Photo processing time: < 15 seconds average (single API call to Gemini)
+- API response time: < 500ms for non-processing endpoints
+- Database query performance: < 100ms average
+- Error rate: < 5% for valid requests
 
-- [ ] Prompt engineering for tourist attraction information
-- [ ] Multi-language content generation
-- [ ] Content quality validation
-- [ ] Cost optimization through caching
+### Functional Requirements
+- ✅ Photo upload and validation (10MB max, JPEG/PNG/WebP)
+- ✅ Landmark recognition via Google Gemini Flash 2.0-lite
+- ✅ Content generation via same Gemini model
+- ✅ Structured JSON responses
+- ✅ Error handling for edge cases
+- ✅ No authentication required (MVP simplification)
 
-### 4.3 Image Processing Pipeline
-- [ ] Image upload validation (size, format, quality)
-- [ ] Image optimization and compression
-- [ ] Temporary storage management
-- [ ] Processing queue for high-load scenarios
-- [ ] Cleanup of processed images
-
-## 5. Core API Endpoints
-
-### 5.1 Authentication APIs
-```go
-// Authentication routes
-router.Group("/api/auth").
-    GET("/google", handlers.GoogleOAuthRedirect).
-    GET("/google/callback", handlers.GoogleOAuthCallback).
-    POST("/refresh", handlers.RefreshToken).
-    POST("/logout", middleware.AuthRequired, handlers.Logout)
-```
-
-### 5.2 Photo Recognition APIs
-```go
-// Recognition routes
-router.Group("/api/recognize", middleware.AuthRequired).
-    POST("/upload", handlers.UploadAndRecognize).      // Main recognition endpoint
-    GET("/history", handlers.GetRecognitionHistory).   // User's recognition history
-    GET("/session/:id", handlers.GetRecognitionSession). // Specific session details
-    DELETE("/session/:id", handlers.DeleteRecognitionSession)
-```
-
-### 5.3 User Management APIs
-```go
-// User routes
-router.Group("/api/user", middleware.AuthRequired).
-    GET("/profile", handlers.GetUserProfile).
-    PUT("/profile", handlers.UpdateUserProfile).
-    GET("/preferences", handlers.GetUserPreferences).
-    PUT("/preferences", handlers.UpdateUserPreferences).
-    DELETE("/account", handlers.DeleteUserAccount)
-```
-
-### 5.4 Content & Attraction APIs
-```go
-// Content routes
-router.Group("/api/attractions").
-    GET("/search", handlers.SearchAttractions).        // Search attractions
-    GET("/:id", handlers.GetAttractionDetails).        // Get specific attraction
-    GET("/popular", handlers.GetPopularAttractions).   // Popular attractions
-    GET("/nearby", handlers.GetNearbyAttractions)      // Location-based search
-```
-
-### 5.5 Analytics & Monitoring APIs
-```go
-// Admin/monitoring routes (protected)
-router.Group("/api/admin", middleware.AdminRequired).
-    GET("/stats", handlers.GetSystemStats).
-    GET("/usage", handlers.GetUsageAnalytics).
-    GET("/health", handlers.HealthCheck)
-```
-
-## 6. Business Logic Services
-
-### 6.1 Recognition Service
-- [ ] Main photo recognition workflow:
-  ```go
-  func (r *RecognitionService) ProcessPhoto(userID string, imageData []byte) (*RecognitionResult, error) {
-      // 1. Validate and process image
-      // 2. Call Google Vision API for recognition
-      // 3. Match results with attraction database
-      // 4. Generate content using Gemini Flash
-      // 5. Cache results for future use
-      // 6. Store recognition session
-      // 7. Return formatted response
-  }
-  ```
-
-- [ ] Confidence threshold management
-- [ ] Fallback handling for unrecognized images
-- [ ] Content caching and retrieval
-- [ ] Performance monitoring and optimization
-
-### 6.2 Content Generation Service
-- [ ] Prompt templates for different attraction types
-- [ ] Content formatting and structure
-- [ ] Multi-language support
-- [ ] Content quality validation
-- [ ] Caching strategies for generated content
-
-### 6.3 User Service
-- [ ] User registration and profile management
-- [ ] Preference handling
-- [ ] Recognition history management
-- [ ] Privacy and data retention compliance
-
-## 7. Caching Strategy
-
-### 7.1 Redis Implementation
-- [ ] Redis client setup and connection pooling
-- [ ] Cache layers:
-  ```go
-  // Cache keys structure
-  "user:profile:{userID}"              // User profile data
-  "content:{contentHash}"              // Generated attraction content
-  "recognition:{attractionName}"       // Recognition results
-  "session:{sessionToken}"             // User session data
-  ```
-
-- [ ] Cache invalidation strategies
-- [ ] TTL management for different data types
-- [ ] Cache warming for popular attractions
-
-### 7.2 Performance Optimization
-- [ ] Database query optimization
-- [ ] API response compression
-- [ ] Image processing optimization
-- [ ] Concurrent processing for multiple requests
-
-## 8. Monitoring & Logging
-
-### 8.1 Structured Logging
-- [ ] Log levels and formatting
-- [ ] Request/response logging
-- [ ] Error tracking and alerting
-- [ ] Performance metrics logging
-
-### 8.2 Health Monitoring
-- [ ] Health check endpoints
-- [ ] Database connection monitoring
-- [ ] External API status monitoring
-- [ ] Resource usage tracking
-
-### 8.3 Analytics Collection
-- [ ] API usage analytics
-- [ ] Recognition success rates
-- [ ] Popular attraction tracking
-- [ ] User engagement metrics
-
-## 9. Testing Strategy
-
-### 9.1 Unit Testing
-- [ ] Service layer testing
-- [ ] Database operation testing
-- [ ] Utility function testing
-- [ ] Mock external API dependencies
-
-### 9.2 Integration Testing
-- [ ] API endpoint testing
-- [ ] Database integration testing
-- [ ] External service integration testing
-- [ ] End-to-end workflow testing
-
-### 9.3 Performance Testing
-- [ ] Load testing for high-traffic scenarios
-- [ ] Database performance testing
-- [ ] External API rate limit testing
-- [ ] Memory and resource usage testing
-
-## 10. Deployment & DevOps
-
-### 10.1 VPS Setup
-- [ ] Server requirements and specifications
-- [ ] Security hardening (firewall, SSH, etc.)
-- [ ] SSL certificate setup
-- [ ] Domain configuration
-
-### 10.2 Coolify Configuration
-- [ ] Coolify installation and setup
-- [ ] Go application deployment configuration
-- [ ] Environment variables management
-- [ ] Database deployment and management
-- [ ] Redis deployment and configuration
-
-### 10.3 Production Configuration
-- [ ] Production environment variables
-- [ ] Database backup and restoration
-- [ ] Log rotation and management
-- [ ] Monitoring and alerting setup
-
-### 10.4 CI/CD Pipeline
-- [ ] Automated testing pipeline
-- [ ] Build and deployment automation
-- [ ] Database migration execution
-- [ ] Rollback procedures
-
-## 11. Security & Compliance
-
-### 11.1 Data Protection
-- [ ] GDPR compliance implementation
-- [ ] User data encryption at rest
-- [ ] Secure API communication (HTTPS)
-- [ ] Input validation and sanitization
-
-### 11.2 API Security
-- [ ] Rate limiting and DDoS protection
-- [ ] API key management
-- [ ] Request signature validation
-- [ ] SQL injection prevention
-
-### 11.3 Image Security
-- [ ] Image validation and sanitization
-- [ ] Malware scanning for uploaded files
-- [ ] Safe image processing
-- [ ] Secure file storage
-
-## 12. Performance & Scalability
-
-### 12.1 Database Optimization
-- [ ] Query optimization and indexing
-- [ ] Connection pooling configuration
-- [ ] Database partitioning strategies
-- [ ] Read replica setup (future enhancement)
-
-### 12.2 API Performance
-- [ ] Response compression
-- [ ] Caching strategies
-- [ ] Async processing for heavy operations
-- [ ] Load balancing preparation
-
-### 12.3 Resource Management
-- [ ] Memory usage optimization
-- [ ] Goroutine management
-- [ ] File system cleanup
-- [ ] External API quota management
+### Code Quality
+- Type-safe database operations with sqlc
+- Comprehensive error handling
+- Clean separation of concerns
+- Unit test coverage > 70%
+- Integration test coverage for critical paths
 
 ---
 
-## Development Timeline (Backend Only)
+## Future Authentication Integration Notes
 
-### Phase 1: Foundation (3-4 weeks)
-- [ ] Project setup and Go structure
-- [ ] Database schema and migrations
-- [ ] Basic web server and middleware
-- [ ] Configuration management
+When ready to add authentication, follow these steps:
 
-### Phase 2: Authentication & Core APIs (3-4 weeks)
-- [ ] Google OAuth implementation
-- [ ] JWT token management
-- [ ] User management APIs
-- [ ] Basic security middleware
+1. **Database Migration**:
+   ```sql
+   -- Add users table
+   CREATE TABLE users (...);
+   
+   -- Add user_id to recognition_sessions
+   ALTER TABLE recognition_sessions 
+   ADD COLUMN user_id UUID REFERENCES users(id) ON DELETE CASCADE;
+   ```
 
-### Phase 3: External Integrations (4-5 weeks)
-- [ ] Google Vision API integration
-- [ ] Google Gemini Flash integration
-- [ ] Image processing pipeline
-- [ ] Content generation service
+2. **Add Auth Modules**:
+   - `internal/auth/` package
+   - Google OAuth endpoints
+   - JWT middleware
+   - User management queries
 
-### Phase 4: Core Features (3-4 weeks)
-- [ ] Photo recognition API
-- [ ] Recognition history management
-- [ ] Content caching implementation
-- [ ] Analytics and monitoring
-
-### Phase 5: Testing & Optimization (2-3 weeks)
-- [ ] Unit and integration testing
-- [ ] Performance optimization
-- [ ] Security hardening
-- [ ] Load testing
-
-### Phase 6: Deployment (2-3 weeks)
-- [ ] VPS setup and configuration
-- [ ] Coolify deployment
-- [ ] Production monitoring
-- [ ] Documentation completion
-
-**Total Backend Development Time: 17-23 weeks**
+3. **API Updates**:
+   - Add `Authorization: Bearer {token}` requirement
+   - Add user context to recognition sessions
+   - Add user-specific endpoints
 
 ## Getting Started
 
-### Immediate Next Steps:
-1. **Initialize Go project structure** in the `backend/` directory
-2. **Set up PostgreSQL** development environment
-3. **Implement basic web server** with Http standard library
-4. **Create database migrations** for core tables
-5. **Set up Google OAuth** client credentials
-6. **Implement basic authentication** flow
+1. **Setup sqlc**: Install sqlc and run initial generation
+2. **Database**: Set up PostgreSQL and run migrations (simplified schema)
+3. **Gemini API**: Configure Google Cloud credentials for Gemini Flash 2.0-lite
+4. **Development**: Start with Phase 1 foundation work
 
-### Development Order:
-1. Start with project structure and database setup
-2. Implement authentication and user management
-3. Add external API integrations (Vision + Gemini)
-4. Build core recognition and content generation features
-5. Add caching, monitoring, and optimization
-6. Prepare for deployment and production
-
-This backend plan provides a comprehensive foundation that can support the mobile application independently, with clear APIs and robust architecture for scalability and maintenance.
+This simplified MVP plan focuses entirely on the core image recognition functionality using a single, powerful multimodal AI service while keeping the architecture clean for future authentication integration. 

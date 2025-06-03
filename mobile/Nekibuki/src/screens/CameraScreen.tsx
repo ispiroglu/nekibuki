@@ -5,12 +5,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Layout, Shadows } from '../constants/theme';
-import PhotoService, { PhotoUploadResponse } from '../services/photoService';
+import PhotoService, { RecognitionResult, AttractionInfo } from '../services/photoService';
 import { UploadProgress } from '../services/api';
 
 interface CameraScreenProps {
   onImageCaptured?: (imageUri: string) => void;
-  onAnalysisComplete?: (result: PhotoUploadResponse) => void;
+  onAnalysisComplete?: (result: RecognitionResult) => void;
 }
 
 const { width, height } = Dimensions.get('window');
@@ -18,6 +18,7 @@ const { width, height } = Dimensions.get('window');
 const CameraScreen: React.FC<CameraScreenProps> = ({ onImageCaptured, onAnalysisComplete }) => {
   const [isCapturing, setIsCapturing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState<string>('');
   const [facing, setFacing] = useState<CameraType>('back');
@@ -83,7 +84,7 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onImageCaptured, onAnalysis
   }
 
   const takePicture = async (): Promise<void> => {
-    if (!cameraRef.current || isCapturing || isUploading) return;
+    if (!cameraRef.current || isCapturing || isUploading || isAnalyzing) return;
 
     try {
       setIsCapturing(true);
@@ -99,8 +100,8 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onImageCaptured, onAnalysis
         console.log('Photo captured:', photo.uri);
         onImageCaptured?.(photo.uri);
 
-        // Start upload process
-        await uploadPhoto(photo.uri);
+        // Start upload and analysis process
+        await uploadAndAnalyzePhoto(photo.uri);
       }
     } catch (error) {
       console.error('Error taking picture:', error);
@@ -110,21 +111,22 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onImageCaptured, onAnalysis
     }
   };
 
-  const uploadPhoto = async (photoUri: string): Promise<void> => {
+  const uploadAndAnalyzePhoto = async (photoUri: string): Promise<void> => {
     try {
       setIsUploading(true);
       setUploadProgress(0);
       setUploadStatus('Uploading photo...');
 
-      // Use mock service for development (replace with real service when backend is ready)
-      //const response = await PhotoService.mockPhotoAnalysis(photoUri);
-      
-      // Uncomment this when you have a real backend:
-      const response = await PhotoService.uploadPhoto(
+      const response = await PhotoService.uploadPhotoAndWaitForAnalysis(
         photoUri,
         (progress: UploadProgress) => {
           setUploadProgress(progress.progress);
           setUploadStatus(`Uploading... ${progress.progress}%`);
+        },
+        (status: string, attempt: number) => {
+          setIsUploading(false);
+          setIsAnalyzing(true);
+          setUploadStatus(status);
         }
       );
 
@@ -132,29 +134,31 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onImageCaptured, onAnalysis
         setUploadStatus('Analysis complete!');
         onAnalysisComplete?.(response.data);
         
-        // Get the landmark name from the parsed analysis object
-        const landmarkName = response.data.data.analysis.name || 'Unknown landmark';
+        // Get the attraction name from the analysis
+        const attractionName = response.data.attraction_info?.name || 'Unknown attraction';
         
-        console.log(response);
+        console.log('Analysis result:', response.data);
+        
         // Show success message
         Alert.alert(
           'Analysis Complete!',
-          `Identified: ${landmarkName}`,
+          `Identified: ${attractionName}`,
           [{ text: 'OK' }]
         );
       } else {
-        console.error('Upload error:', response);
-        throw new Error(response.error || 'Upload failed');
+        console.error('Analysis error:', response);
+        throw new Error(response.error || 'Analysis failed');
       }
     } catch (error) {
-      console.error('Upload error:', error);
+      console.error('Upload and analysis error:', error);
       Alert.alert(
-        'Upload Failed',
-        error instanceof Error ? error.message : 'Failed to upload photo. Please try again.',
+        'Analysis Failed',
+        error instanceof Error ? error.message : 'Failed to analyze photo. Please try again.',
         [{ text: 'OK' }]
       );
     } finally {
       setIsUploading(false);
+      setIsAnalyzing(false);
       setUploadProgress(0);
       setUploadStatus('');
     }
@@ -168,7 +172,7 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onImageCaptured, onAnalysis
     if (isCapturing) {
       return <Text style={styles.statusText}>📸</Text>;
     }
-    if (isUploading) {
+    if (isUploading || isAnalyzing) {
       return <Text style={styles.statusText}>⏳</Text>;
     }
     return <View style={styles.shutterButtonInner} />;
@@ -176,9 +180,11 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onImageCaptured, onAnalysis
 
   const getStatusText = () => {
     if (isCapturing) return 'Capturing...';
-    if (isUploading) return uploadStatus;
+    if (isUploading || isAnalyzing) return uploadStatus;
     return '';
   };
+
+  const isProcessing = isCapturing || isUploading || isAnalyzing;
 
   return (
     <View style={styles.container}>
@@ -198,17 +204,17 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onImageCaptured, onAnalysis
             <TouchableOpacity
               style={[
                 styles.shutterButton,
-                (isCapturing || isUploading) && styles.shutterButtonDisabled
+                isProcessing && styles.shutterButtonDisabled
               ]}
               onPress={takePicture}
-              disabled={isCapturing || isUploading}
+              disabled={isProcessing}
               activeOpacity={0.7}
             >
               {getButtonContent()}
             </TouchableOpacity>
             
             {/* Upload Progress */}
-            {isUploading && (
+            {isProcessing && (
               <View style={styles.progressContainer}>
                 <View style={styles.progressBar}>
                   <View 

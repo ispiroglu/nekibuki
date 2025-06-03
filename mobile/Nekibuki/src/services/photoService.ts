@@ -1,5 +1,39 @@
 import ApiService, { ApiResponse, UploadProgress } from './api';
 
+// Updated interfaces to match swagger definitions
+export interface AttractionInfo {
+  confidence: number;
+  description: string;
+  historical_info: string;
+  interesting_facts: string[];
+  location: {
+    city: string;
+    country: string;
+    region: string;
+  };
+  name: string;
+  significance: string;
+}
+
+export interface RecognitionResponse {
+  message: string;
+  session_id: string;
+  status: string;
+}
+
+export interface RecognitionResult {
+  attraction_info?: AttractionInfo;
+  error?: {
+    code: string;
+    details: string;
+    message: string;
+  };
+  processing_time_ms: number;
+  session_id: string;
+  status: string;
+}
+
+// Legacy interface for backward compatibility
 export interface LandmarkAnalysis {
   id: string;
   name: string;
@@ -24,67 +58,196 @@ export interface LandmarkAnalysis {
 export interface PhotoUploadResponse {
   success: boolean;
   message: string;
-  data: {
-    id: string;
-    fileName: string;
-    fileSize: number;
-    mimeType: string;
-    prompt: string;
-    analysis: LandmarkAnalysis; // Now a parsed object instead of JSON string
-    status: string;
-    createdAt: string;
-    completedAt?: string;
-    errorMsg?: string;
-  };
-  error?: string;
+  session_id: string;
+  status: string;
 }
 
 export interface AnalysisStatusResponse {
   status: 'pending' | 'processing' | 'completed' | 'failed';
   progress?: number;
-  analysis?: LandmarkAnalysis;
+  result?: RecognitionResult;
   error?: string;
 }
 
 class PhotoService {
+  private readonly POLLING_INTERVAL = 2000; // 2 seconds
+  private readonly MAX_POLLING_ATTEMPTS = 30; // 1 minute total
+
   /**
-   * Upload a photo for landmark analysis
+   * Upload a photo for landmark analysis using the swagger-documented endpoint
    */
   async uploadPhoto(
     photoUri: string,
     onProgress?: (progress: UploadProgress) => void
-  ): Promise<ApiResponse<PhotoUploadResponse>> {
+  ): Promise<ApiResponse<RecognitionResponse>> {
     const fileName = `photo_${Date.now()}.jpg`;
     
-    const response = await ApiService.uploadFile<PhotoUploadResponse>(
-      '/api/v1/upload',
-      photoUri,
-      fileName,
-      onProgress
-    );
-
-    return response;
+    
+      return ApiService.uploadFileWithPost<RecognitionResponse>(
+        '/api/recognition/upload',
+        photoUri,
+        fileName,
+        'photo' // use 'photo' as the form field name to match swagger
+      );
+    
   }
 
   /**
-   * Get analysis status and results for a photo
+   * Get analysis result for a session ID
    */
-  async getAnalysisStatus(photoId: string): Promise<ApiResponse<AnalysisStatusResponse>> {
-    return ApiService.get<AnalysisStatusResponse>(`/photos/${photoId}/analysis`);
+  async getAnalysisResult(sessionId: string): Promise<ApiResponse<RecognitionResult>> {
+    return ApiService.get<RecognitionResult>(`/api/recognition/result/${sessionId}`);
   }
 
   /**
-   * Get user's photo history
+   * Poll for analysis completion with automatic retry
    */
-  async getPhotoHistory(): Promise<ApiResponse<PhotoUploadResponse[]>> {
-    return ApiService.get<PhotoUploadResponse[]>('/photos/history');
+  async pollForAnalysisResult(
+    sessionId: string,
+    onProgress?: (status: string, attempt: number) => void
+  ): Promise<ApiResponse<RecognitionResult>> {
+    let attempt = 0;
+    
+    while (attempt < this.MAX_POLLING_ATTEMPTS) {
+      attempt++;
+      
+      try {
+        onProgress?.(`Checking analysis status... (${attempt}/${this.MAX_POLLING_ATTEMPTS})`, attempt);
+        
+        const response = await this.getAnalysisResult(sessionId);
+        
+        if (!response.success) {
+          // If we get an error, continue polling as it might be temporary
+          if (attempt === this.MAX_POLLING_ATTEMPTS) {
+            return response;
+          }
+        } else if (response.data) {
+          const result = response.data;
+          
+          // Check if processing is complete
+          if (result.status === 'completed') {
+            return response;
+          } else if (result.status === 'failed') {
+            return {
+              success: false,
+              error: result.error?.message || 'Analysis failed',
+            };
+          }
+          // If status is 'pending' or 'processing', continue polling
+        }
+        
+        // Wait before next attempt
+        if (attempt < this.MAX_POLLING_ATTEMPTS) {
+          await new Promise(resolve => setTimeout(resolve, this.POLLING_INTERVAL));
+        }
+      } catch (error) {
+        console.error('Polling error:', error);
+        if (attempt === this.MAX_POLLING_ATTEMPTS) {
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Polling failed',
+          };
+        }
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, this.POLLING_INTERVAL));
+      }
+    }
+    
+    return {
+      success: false,
+      error: 'Analysis timed out - please try again',
+    };
   }
 
   /**
-   * Delete a photo
+   * Complete upload and analysis workflow
+   */
+  async uploadPhotoAndWaitForAnalysis(
+    photoUri: string,
+    onUploadProgress?: (progress: UploadProgress) => void,
+    onAnalysisProgress?: (status: string, attempt: number) => void
+  ): Promise<ApiResponse<RecognitionResult>> {
+    try {
+      // Step 1: Upload photo with progress tracking if callback provided
+      const uploadResponse = await this.uploadPhoto(photoUri, onUploadProgress);
+      
+      if (!uploadResponse.success || !uploadResponse.data) {
+        return {
+          success: false,
+          error: uploadResponse.error || 'Failed to upload photo',
+        };
+      }
+      
+      const sessionId = uploadResponse.data.session_id;
+      
+      // Step 2: Poll for results
+      const analysisResponse = await this.pollForAnalysisResult(sessionId, onAnalysisProgress);
+      
+      return analysisResponse;
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Upload and analysis failed',
+      };
+    }
+  }
+
+  /**
+   * Convert new AttractionInfo format to legacy LandmarkAnalysis format for backward compatibility
+   */
+  convertToLegacyFormat(attractionInfo: AttractionInfo): LandmarkAnalysis {
+    return {
+      id: `attraction_${Date.now()}`,
+      name: attractionInfo.name,
+      confidence: attractionInfo.confidence,
+      location: {
+        latitude: 0, // Not available in new format
+        longitude: 0, // Not available in new format
+        address: `${attractionInfo.location.city}, ${attractionInfo.location.region}, ${attractionInfo.location.country}`,
+      },
+      description: attractionInfo.description,
+      facts: attractionInfo.interesting_facts,
+      historicalInfo: {
+        period: 'Unknown', // Not available in new format
+        significance: attractionInfo.significance,
+      },
+      quickFacts: {
+        'Historical Info': attractionInfo.historical_info,
+        'Significance': attractionInfo.significance,
+        'Location': `${attractionInfo.location.city}, ${attractionInfo.location.country}`,
+      },
+    };
+  }
+
+  /**
+   * Get user's photo history (placeholder - not implemented in swagger)
+   */
+  async getPhotoHistory(): Promise<ApiResponse<any[]>> {
+    // This endpoint is not defined in the swagger file
+    // You may need to implement this on the backend
+    return {
+      success: false,
+      error: 'Photo history endpoint not implemented',
+    };
+  }
+
+  /**
+   * Delete a photo (placeholder - not implemented in swagger)
    */
   async deletePhoto(photoId: string): Promise<ApiResponse<{ success: boolean }>> {
-    return ApiService.post<{ success: boolean }>(`/photos/${photoId}/delete`, {});
+    // This endpoint is not defined in the swagger file
+    // You may need to implement this on the backend
+    return {
+      success: false,
+      error: 'Delete photo endpoint not implemented',
+    };
+  }
+
+  /**
+   * Get recent sessions for debugging
+   */
+  async getRecentSessions(limit: number = 10): Promise<ApiResponse<any[]>> {
+    return ApiService.get<any[]>(`/api/recognition/sessions?limit=${limit}`);
   }
 
   /**
@@ -102,7 +265,7 @@ class PhotoService {
   }
 
   /**
-   * Parse landmark analysis from JSON string
+   * Parse landmark analysis from JSON string (legacy method)
    */
   parseLandmarkAnalysis(analysisJson: string): LandmarkAnalysis | null {
     try {
@@ -117,53 +280,34 @@ class PhotoService {
    * Mock function for development - simulates photo analysis
    * Remove this when you have a real backend
    */
-  async mockPhotoAnalysis(photoUri: string): Promise<ApiResponse<PhotoUploadResponse>> {
+  async mockPhotoAnalysis(photoUri: string): Promise<ApiResponse<RecognitionResult>> {
     return new Promise((resolve) => {
       setTimeout(() => {
-        const mockLandmark: LandmarkAnalysis = {
-          id: 'landmark_001',
+        const mockAttractionInfo: AttractionInfo = {
           name: 'The Eiffel Tower',
           confidence: 95,
-          location: {
-            latitude: 48.8584,
-            longitude: 2.2945,
-            address: 'Champ de Mars, 5 Avenue Anatole France, 75007 Paris, France',
-          },
           description: 'The Eiffel Tower is a wrought-iron lattice tower on the Champ de Mars in Paris, France.',
-          facts: [
+          historical_info: 'Built for the 1889 World\'s Fair as the entrance arch',
+          interesting_facts: [
             'Built for the 1889 World\'s Fair',
             'Originally intended to be temporary',
             'Can be 15 cm taller in summer due to thermal expansion',
           ],
-          historicalInfo: {
-            period: '1887-1889',
-            architect: 'Gustave Eiffel',
-            significance: 'Symbol of France and engineering marvel of the 19th century',
+          location: {
+            city: 'Paris',
+            region: 'Île-de-France',
+            country: 'France',
           },
-          quickFacts: {
-            'Height': '330 meters',
-            'Construction': '1887-1889',
-            'Visitors/Year': '7 million',
-            'Weight': '10,100 tons',
-          },
+          significance: 'Symbol of France and engineering marvel of the 19th century',
         };
 
         resolve({
           success: true,
           data: {
-            success: true,
-            message: 'File analyzed successfully',
-            data: {
-              id: `photo_${Date.now()}`,
-              fileName: 'photo.jpg',
-              fileSize: 123456,
-              mimeType: 'image/jpeg',
-              prompt: 'Analyze this landmark',
-              analysis: mockLandmark,
-              status: 'completed',
-              createdAt: new Date().toISOString(),
-              completedAt: new Date().toISOString(),
-            },
+            session_id: `session_${Date.now()}`,
+            status: 'completed',
+            processing_time_ms: 2000,
+            attraction_info: mockAttractionInfo,
           },
         });
       }, 2000); // Simulate 2 second processing time
