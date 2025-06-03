@@ -24,7 +24,7 @@ type AttractionInfo struct {
 	Significance     string        `json:"significance"`
 	InterestingFacts []string      `json:"interesting_facts"`
 	Location         *LocationInfo `json:"location,omitempty"`
-	Confidence       float64       `json:"confidence"`
+	Confidence       int           `json:"confidence"`
 }
 
 // LocationInfo represents location details
@@ -95,8 +95,8 @@ func (g *GeminiService) AnalyzeImageAndGenerateInfo(ctx context.Context, imageDa
 				Nullable: func() *bool { b := true; return &b }(),
 			},
 			"confidence": {
-				Type:        "number",
-				Description: "Confidence score between 0.0 and 1.0",
+				Type:        "integer",
+				Description: "Confidence score between 0 and 100",
 			},
 		},
 		Required: []string{"name", "description", "historical_info", "significance", "interesting_facts", "confidence"},
@@ -109,8 +109,8 @@ Analyze this image and identify any tourist attractions, landmarks, or notable l
 If you can identify a tourist attraction or landmark in the image:
 1. Provide detailed information about it
 2. Be confident only if you can clearly identify the location
-3. Set confidence to a value between 0.5 and 1.0 if you can identify the attraction
-4. Set confidence to a value below 0.5 if you cannot clearly identify any specific attraction
+3. Set confidence to a value between 0 and 100 if you can identify the attraction
+4. Set confidence to a value below 30 if you cannot clearly identify any specific attraction
 
 Focus on factual, engaging information suitable for tourists.
 `
@@ -153,8 +153,8 @@ Focus on factual, engaging information suitable for tourists.
 	}
 
 	// Check if confidence indicates a valid attraction was found
-	if attractionInfo.Confidence < 0.5 {
-		return nil, fmt.Errorf("no recognizable tourist attraction found (confidence: %.2f)", attractionInfo.Confidence)
+	if attractionInfo.Confidence < 30 {
+		return nil, fmt.Errorf("no recognizable tourist attraction found (confidence: %d)", attractionInfo.Confidence)
 	}
 
 	return &attractionInfo, nil

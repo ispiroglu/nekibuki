@@ -1,19 +1,59 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../constants/theme';
+import PhotoService, { RecognitionResult } from '../services/photoService';
+import { RootStackParamList } from '../types';
 
-interface LoadingScreenProps {
-  imageUri?: string;
-  onCancel?: () => void;
-}
+type LoadingScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Loading'>;
+type LoadingScreenRouteProp = RouteProp<RootStackParamList, 'Loading'>;
 
 const { width } = Dimensions.get('window');
 
-const LoadingScreen: React.FC<LoadingScreenProps> = ({ imageUri, onCancel }) => {
+const LoadingScreen: React.FC = () => {
+  const navigation = useNavigation<LoadingScreenNavigationProp>();
+  const route = useRoute<LoadingScreenRouteProp>();
+  const { imageUri } = route.params;
+  
   const [progress, setProgress] = useState(0);
   const [currentStatus, setCurrentStatus] = useState('Identifying landmarks');
+
+  useEffect(() => {
+    // Start the analysis process
+    analyzePhoto();
+  }, []);
+
+  const analyzePhoto = async () => {
+    try {
+      const response = await PhotoService.uploadPhotoAndWaitForAnalysis(
+        imageUri,
+        (progress) => {
+          setProgress(progress.progress);
+        },
+        (status, attempt) => {
+          setCurrentStatus(status);
+        }
+      );
+
+      if (response.success && response.data) {
+        // Navigate to result screen
+        navigation.replace('Result', { result: response.data, imageUri });
+      } else {
+        throw new Error(response.error || 'Analysis failed');
+      }
+    } catch (error) {
+      console.error('Analysis error:', error);
+      // Navigate back to main screen on error
+      navigation.goBack();
+    }
+  };
+
+  const handleCancel = () => {
+    navigation.goBack();
+  };
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -47,7 +87,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ imageUri, onCancel }) => 
       {/* Header */}
       <SafeAreaView style={styles.header}>
         <View style={styles.headerContainer}>
-          <TouchableOpacity style={styles.backButton} onPress={onCancel}>
+          <TouchableOpacity style={styles.backButton} onPress={handleCancel}>
             <Ionicons name="chevron-back" size={16} color={Colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Nekibuki</Text>
@@ -58,13 +98,17 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ imageUri, onCancel }) => 
       <View style={styles.main}>
         {/* Image Preview */}
         <View style={styles.imageContainer}>
-          <View style={styles.imagePlaceholder}>
-            {imageUri ? (
-              <Text style={styles.imageText}>Photo Preview</Text>
-            ) : (
+          {imageUri ? (
+            <Image 
+              source={{ uri: imageUri }} 
+              style={styles.imagePreview}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={styles.imagePlaceholder}>
               <Ionicons name="image" size={64} color={Colors.textTertiary} />
-            )}
-          </View>
+            </View>
+          )}
         </View>
 
         {/* Processing Content */}
@@ -119,7 +163,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ imageUri, onCancel }) => 
 
       {/* Footer */}
       <SafeAreaView style={styles.footer}>
-        <TouchableOpacity style={styles.cancelButton} onPress={onCancel}>
+        <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
           <Text style={styles.cancelButtonText}>Cancel</Text>
         </TouchableOpacity>
       </SafeAreaView>
@@ -168,9 +212,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  imageText: {
-    ...Typography.body,
-    color: Colors.textSecondary,
+  imagePreview: {
+    flex: 1,
   },
   contentContainer: {
     flex: 1,

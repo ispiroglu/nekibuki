@@ -1,5 +1,8 @@
+// Import the correct types from photoService
+import type { RecognitionResult, AttractionInfo } from '../services/photoService';
+
 // Photo recognition types
-export interface RecognitionResult {
+export interface LegacyRecognitionResult {
   id: string;
   attraction_name: string;
   description: string;
@@ -9,6 +12,9 @@ export interface RecognitionResult {
   image_url?: string;
   timestamp: string;
 }
+
+// Re-export the types for convenience
+export type { RecognitionResult, AttractionInfo };
 
 // API response types
 export interface ApiResponse<T> {
@@ -26,7 +32,8 @@ export interface ApiError {
 // Navigation types
 export type RootStackParamList = {
   Main: undefined;
-  Result: { result: RecognitionResult };
+  Loading: { imageUri: string };
+  Result: { result: RecognitionResult; imageUri?: string };
 };
 
 export type MainTabParamList = {

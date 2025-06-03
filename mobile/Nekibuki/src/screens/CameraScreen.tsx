@@ -4,32 +4,60 @@ import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { Colors, Typography, Spacing, Layout, Shadows } from '../constants/theme';
 import PhotoService, { RecognitionResult, AttractionInfo } from '../services/photoService';
 import { UploadProgress } from '../services/api';
+import { RootStackParamList } from '../types';
+
+type CameraScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Main'>;
 
 interface CameraScreenProps {
   onImageCaptured?: (imageUri: string) => void;
   onAnalysisComplete?: (result: RecognitionResult) => void;
+  isFocused?: boolean;
 }
 
 const { width, height } = Dimensions.get('window');
 
-const CameraScreen: React.FC<CameraScreenProps> = ({ onImageCaptured, onAnalysisComplete }) => {
+const CameraScreen: React.FC<CameraScreenProps> = ({ 
+  onImageCaptured, 
+  onAnalysisComplete, 
+  isFocused = true 
+}) => {
+  const navigation = useNavigation<CameraScreenNavigationProp>();
   const [isCapturing, setIsCapturing] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadStatus, setUploadStatus] = useState<string>('');
   const [facing, setFacing] = useState<CameraType>('back');
   const [permission, requestPermission] = useCameraPermissions();
   const [cameraKey, setCameraKey] = useState(0);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [shouldShowCamera, setShouldShowCamera] = useState(false);
   const cameraRef = useRef<CameraView>(null);
+
+  // Handle camera lifecycle based on focus state
+  useEffect(() => {
+    if (isFocused && permission?.granted) {
+      // Add a small delay to ensure smooth transitions
+      const timer = setTimeout(() => {
+        setShouldShowCamera(true);
+        setCameraKey(prev => prev + 1);
+      }, 100);
+      return () => clearTimeout(timer);
+    } else {
+      setShouldShowCamera(false);
+      // Reset any ongoing capture state when camera becomes unfocused
+      if (isCapturing) {
+        setIsCapturing(false);
+      }
+    }
+  }, [isFocused, permission?.granted, isCapturing]);
 
   // Force camera refresh when component mounts to fix restart bug
   useEffect(() => {
-    setCameraKey(prev => prev + 1);
+    if (isFocused && permission?.granted) {
+      setCameraKey(prev => prev + 1);
+    }
   }, []);
 
   // Add timeout for permission check
@@ -84,11 +112,10 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onImageCaptured, onAnalysis
   }
 
   const takePicture = async (): Promise<void> => {
-    if (!cameraRef.current || isCapturing || isUploading || isAnalyzing) return;
+    if (!cameraRef.current || isCapturing) return;
 
     try {
       setIsCapturing(true);
-      setUploadStatus('Capturing photo...');
       
       const photo = await cameraRef.current.takePictureAsync({
         quality: 0.8,
@@ -100,67 +127,14 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onImageCaptured, onAnalysis
         console.log('Photo captured:', photo.uri);
         onImageCaptured?.(photo.uri);
 
-        // Start upload and analysis process
-        await uploadAndAnalyzePhoto(photo.uri);
+        // Navigate to loading screen for analysis
+        navigation.navigate('Loading', { imageUri: photo.uri });
       }
     } catch (error) {
       console.error('Error taking picture:', error);
       Alert.alert('Error', 'Failed to take picture. Please try again.');
     } finally {
       setIsCapturing(false);
-    }
-  };
-
-  const uploadAndAnalyzePhoto = async (photoUri: string): Promise<void> => {
-    try {
-      setIsUploading(true);
-      setUploadProgress(0);
-      setUploadStatus('Uploading photo...');
-
-      const response = await PhotoService.uploadPhotoAndWaitForAnalysis(
-        photoUri,
-        (progress: UploadProgress) => {
-          setUploadProgress(progress.progress);
-          setUploadStatus(`Uploading... ${progress.progress}%`);
-        },
-        (status: string, attempt: number) => {
-          setIsUploading(false);
-          setIsAnalyzing(true);
-          setUploadStatus(status);
-        }
-      );
-
-      if (response.success && response.data) {
-        setUploadStatus('Analysis complete!');
-        onAnalysisComplete?.(response.data);
-        
-        // Get the attraction name from the analysis
-        const attractionName = response.data.attraction_info?.name || 'Unknown attraction';
-        
-        console.log('Analysis result:', response.data);
-        
-        // Show success message
-        Alert.alert(
-          'Analysis Complete!',
-          `Identified: ${attractionName}`,
-          [{ text: 'OK' }]
-        );
-      } else {
-        console.error('Analysis error:', response);
-        throw new Error(response.error || 'Analysis failed');
-      }
-    } catch (error) {
-      console.error('Upload and analysis error:', error);
-      Alert.alert(
-        'Analysis Failed',
-        error instanceof Error ? error.message : 'Failed to analyze photo. Please try again.',
-        [{ text: 'OK' }]
-      );
-    } finally {
-      setIsUploading(false);
-      setIsAnalyzing(false);
-      setUploadProgress(0);
-      setUploadStatus('');
     }
   };
 
@@ -172,60 +146,51 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ onImageCaptured, onAnalysis
     if (isCapturing) {
       return <Text style={styles.statusText}>📸</Text>;
     }
-    if (isUploading || isAnalyzing) {
-      return <Text style={styles.statusText}>⏳</Text>;
-    }
     return <View style={styles.shutterButtonInner} />;
   };
 
   const getStatusText = () => {
     if (isCapturing) return 'Capturing...';
-    if (isUploading || isAnalyzing) return uploadStatus;
     return '';
   };
 
-  const isProcessing = isCapturing || isUploading || isAnalyzing;
+  const isProcessing = isCapturing;
 
   return (
     <View style={styles.container}>
       {/* Viewfinder Container */}
       <View style={styles.viewfinderContainer}>
         <View style={styles.viewfinderFrame}>
-          <CameraView
-            key={cameraKey}
-            ref={cameraRef}
-            style={styles.camera}
-            facing={facing}
-            mode="picture"
-          />
+          {shouldShowCamera && isFocused ? (
+            <CameraView
+              key={cameraKey}
+              ref={cameraRef}
+              style={styles.camera}
+              facing={facing}
+              mode="picture"
+            />
+          ) : (
+            <View style={styles.cameraPlaceholder}>
+              <Ionicons name="camera" size={64} color={Colors.textTertiary} />
+              <Text style={styles.placeholderText}>
+                {!permission?.granted ? 'Camera permission required' : 'Camera loading...'}
+              </Text>
+            </View>
+          )}
           
           {/* Shutter Button Inside Viewfinder */}
           <View style={styles.shutterOverlay}>
             <TouchableOpacity
               style={[
                 styles.shutterButton,
-                isProcessing && styles.shutterButtonDisabled
+                (isProcessing || !shouldShowCamera || !isFocused) && styles.shutterButtonDisabled
               ]}
               onPress={takePicture}
-              disabled={isProcessing}
+              disabled={isProcessing || !shouldShowCamera || !isFocused}
               activeOpacity={0.7}
             >
               {getButtonContent()}
             </TouchableOpacity>
-            
-            {/* Upload Progress */}
-            {isProcessing && (
-              <View style={styles.progressContainer}>
-                <View style={styles.progressBar}>
-                  <View 
-                    style={[
-                      styles.progressFill, 
-                      { width: `${uploadProgress}%` }
-                    ]} 
-                  />
-                </View>
-              </View>
-            )}
           </View>
         </View>
       </View>
@@ -330,24 +295,6 @@ const styles = StyleSheet.create({
     color: '#1C0D14',
     textAlign: 'center',
   },
-  progressContainer: {
-    width: 200,
-    height: 6,
-    backgroundColor: 'rgba(250, 247, 250, 0.8)',
-    borderRadius: 3,
-    overflow: 'hidden',
-    marginTop: 15,
-  },
-  progressBar: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: 'transparent',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#964F75',
-    borderRadius: 3,
-  },
   shutterButtonText: {
     fontFamily: 'Space Grotesk',
     fontSize: 16,
@@ -380,6 +327,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
     textAlign: 'center',
+  },
+  cameraPlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.md,
+  },
+  placeholderText: {
+    fontFamily: 'Space Grotesk',
+    fontSize: 16,
+    fontWeight: '500',
+    color: Colors.textTertiary,
+    textAlign: 'center',
+    marginTop: Spacing.md,
   },
 });
 

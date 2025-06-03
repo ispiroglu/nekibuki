@@ -1,60 +1,89 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../constants/theme';
+import { RootStackParamList, RecognitionResult, AttractionInfo } from '../types';
 
-interface ReportScreenProps {
-  onBack?: () => void;
-  onRetake?: () => void;
-  onShare?: () => void;
-  onSave?: () => void;
-  onAskNekibuki?: () => void;
-  landmark?: {
-    name: string;
-    confidence: number;
-    location: string;
-    style: string;
-    capacity: string;
-    constructionPeriod: string;
-    openingDate: string;
-    unescoSite: string;
-    description: string[];
-  };
-}
+type ReportScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Result'>;
+type ReportScreenRouteProp = RouteProp<RootStackParamList, 'Result'>;
 
 const { width } = Dimensions.get('window');
 
-const defaultLandmark = {
-  name: 'The Colosseum',
-  confidence: 95,
-  location: 'Rome, Italy',
-  style: 'Roman Amphitheater',
-  capacity: '50,000 spectators',
-  constructionPeriod: '70-80 AD',
-  openingDate: '80 AD',
-  unescoSite: 'Yes',
-  description: [
-    'The Colosseum, also known as the Flavian Amphitheatre, is an elliptical amphitheatre in the centre of the city of Rome, Italy. Built of concrete and sand, it is the largest amphitheatre ever built. It is considered one of the greatest works of Roman architecture and engineering.',
-    'The Colosseum could hold an estimated 50,000 to 80,000 spectators, having an average audience of some 65,000; it was used for gladiatorial contests and public spectacles such as mock sea battles, animal hunts, executions, re-enactments of famous battles, and dramas based on Classical mythology.',
-    'The Colosseum remained in use for over 400 years, with the last recorded games being held in the 6th century AD. It is now one of Rome\'s most popular tourist attractions and still has close connections with the Roman Catholic Church, as every Good Friday the Pope leads a torchlit "Way of the Cross" procession that starts in the area around the Colosseum.'
-  ]
-};
+const ReportScreen: React.FC = () => {
+  const navigation = useNavigation<ReportScreenNavigationProp>();
+  const route = useRoute<ReportScreenRouteProp>();
+  const { result, imageUri } = route.params;
 
-const ReportScreen: React.FC<ReportScreenProps> = ({ 
-  onBack, 
-  onRetake, 
-  onShare, 
-  onSave, 
-  onAskNekibuki,
-  landmark = defaultLandmark 
-}) => {
+  const attractionInfo = result.attraction_info;
+
+  // Helper function to format location
+  const formatLocation = (location?: AttractionInfo['location']): string => {
+    if (!location) return 'Unknown location';
+    const parts = [location.city, location.region, location.country].filter(Boolean);
+    return parts.join(', ');
+  };
+
+  // Helper function to split description into paragraphs
+  const formatDescription = (description?: string): string[] => {
+    if (!description) return ['No description available.'];
+    // Split by double newlines or periods followed by space and capital letter
+    const paragraphs = description
+      .split(/\n\n|\. (?=[A-Z])/)
+      .map(p => p.trim())
+      .filter(p => p.length > 0);
+    return paragraphs.length > 0 ? paragraphs : [description];
+  };
+
+  // Helper function to format interesting facts
+  const formatInterestingFacts = (facts?: string[]): string[] => {
+    if (!facts || facts.length === 0) return [];
+    return facts.filter(fact => fact && fact.trim().length > 0);
+  };
+
+  const handleBack = () => {
+    navigation.goBack();
+  };
+
+  const handleRetake = () => {
+    navigation.navigate('Main');
+  };
+
+  const handleShare = () => {
+    // TODO: Implement share functionality
+    console.log('Share functionality to be implemented');
+  };
+
+  const handleSave = () => {
+    // TODO: Implement save functionality
+    console.log('Save functionality to be implemented');
+  };
+
+  const handleAskNekibuki = () => {
+    // TODO: Implement AI chat functionality
+    console.log('Ask Nekibuki functionality to be implemented');
+  };
+
+  // Fallback data if no attraction info is available
+  if (!attractionInfo) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={styles.errorText}>No attraction information available</Text>
+        <TouchableOpacity style={styles.errorButton} onPress={handleBack}>
+          <Text style={styles.errorButtonText}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {/* Header */}
       <SafeAreaView style={styles.header}>
         <View style={styles.headerContainer}>
-          <TouchableOpacity style={styles.backButton} onPress={onBack}>
+          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
             <Ionicons name="chevron-back" size={16} color={Colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Nekibuki</Text>
@@ -65,21 +94,25 @@ const ReportScreen: React.FC<ReportScreenProps> = ({
       <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         {/* Image */}
         <View style={styles.imageContainer}>
-          <View style={styles.imagePlaceholder}>
-            <Ionicons name="image" size={64} color={Colors.textSecondary} />
-          </View>
+          {imageUri ? (
+            <Image source={{ uri: imageUri }} style={styles.image} />
+          ) : (
+            <View style={styles.imagePlaceholder}>
+              <Ionicons name="image" size={64} color={Colors.textSecondary} />
+            </View>
+          )}
         </View>
 
         {/* Content */}
         <View style={styles.contentContainer}>
           {/* Header Info */}
           <View style={styles.landmarkHeader}>
-            <Text style={styles.landmarkName}>{landmark.name}</Text>
+            <Text style={styles.landmarkName}>{attractionInfo.name}</Text>
             <View style={styles.confidenceContainer}>
               <View style={styles.confidenceIcon}>
                 <Ionicons name="checkmark-circle" size={18} color="#16A34A" />
               </View>
-              <Text style={styles.confidenceText}>{landmark.confidence}% Confidence</Text>
+              <Text style={styles.confidenceText}>{attractionInfo.confidence}% Confidence</Text>
             </View>
           </View>
 
@@ -89,28 +122,24 @@ const ReportScreen: React.FC<ReportScreenProps> = ({
             <View style={styles.factsContainer}>
               <View style={styles.factRow}>
                 <Text style={styles.factLabel}>Location</Text>
-                <Text style={styles.factValue}>{landmark.location}</Text>
+                <Text style={styles.factValue}>{formatLocation(attractionInfo.location)}</Text>
               </View>
               <View style={styles.factRow}>
-                <Text style={styles.factLabel}>Architectural Style</Text>
-                <Text style={styles.factValue}>{landmark.style}</Text>
+                <Text style={styles.factLabel}>Confidence</Text>
+                <Text style={styles.factValue}>{attractionInfo.confidence}%</Text>
               </View>
-              <View style={styles.factRow}>
-                <Text style={styles.factLabel}>Capacity</Text>
-                <Text style={styles.factValue}>{landmark.capacity}</Text>
-              </View>
-              <View style={styles.factRow}>
-                <Text style={styles.factLabel}>Construction Period</Text>
-                <Text style={styles.factValue}>{landmark.constructionPeriod}</Text>
-              </View>
-              <View style={styles.factRow}>
-                <Text style={styles.factLabel}>Opening Date</Text>
-                <Text style={styles.factValue}>{landmark.openingDate}</Text>
-              </View>
-              <View style={styles.factRow}>
-                <Text style={styles.factLabel}>UNESCO Site</Text>
-                <Text style={styles.factValue}>{landmark.unescoSite}</Text>
-              </View>
+              {attractionInfo.significance && (
+                <View style={styles.factRow}>
+                  <Text style={styles.factLabel}>Significance</Text>
+                  <Text style={styles.factValue}>{attractionInfo.significance}</Text>
+                </View>
+              )}
+              {attractionInfo.historical_info && (
+                <View style={styles.factRow}>
+                  <Text style={styles.factLabel}>Historical Info</Text>
+                  <Text style={styles.factValue}>{attractionInfo.historical_info}</Text>
+                </View>
+              )}
             </View>
           </View>
 
@@ -118,34 +147,48 @@ const ReportScreen: React.FC<ReportScreenProps> = ({
           <View style={styles.aboutSection}>
             <Text style={styles.sectionTitle}>About</Text>
             <View style={styles.aboutContent}>
-              {landmark.description.map((paragraph, index) => (
+              {formatDescription(attractionInfo.description).map((paragraph, index) => (
                 <Text key={index} style={styles.aboutText}>
                   {paragraph}
                 </Text>
               ))}
             </View>
           </View>
+
+          {/* Interesting Facts Section */}
+          {formatInterestingFacts(attractionInfo.interesting_facts).length > 0 && (
+            <View style={styles.aboutSection}>
+              <Text style={styles.sectionTitle}>Interesting Facts</Text>
+              <View style={styles.aboutContent}>
+                {formatInterestingFacts(attractionInfo.interesting_facts).map((fact, index) => (
+                  <Text key={index} style={styles.aboutText}>
+                    • {fact}
+                  </Text>
+                ))}
+              </View>
+            </View>
+          )}
         </View>
       </ScrollView>
 
       {/* Footer */}
       <SafeAreaView style={styles.footer}>
         <View style={styles.actionButtons}>
-          <TouchableOpacity style={styles.actionButton} onPress={onRetake}>
+          <TouchableOpacity style={styles.actionButton} onPress={handleRetake}>
             <View style={styles.actionButtonIcon}>
               <Ionicons name="camera" size={20} color="#334155" />
             </View>
             <Text style={styles.actionButtonText}>Retake</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.actionButton} onPress={onShare}>
+          <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
             <View style={styles.actionButtonIcon}>
               <Ionicons name="share" size={20} color="#334155" />
             </View>
             <Text style={styles.actionButtonText}>Share</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.saveButton} onPress={onSave}>
+          <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
             <View style={styles.saveButtonIcon}>
               <Ionicons name="bookmark" size={20} color={Colors.surface} />
             </View>
@@ -153,7 +196,7 @@ const ReportScreen: React.FC<ReportScreenProps> = ({
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.askButton} onPress={onAskNekibuki}>
+        <TouchableOpacity style={styles.askButton} onPress={handleAskNekibuki}>
           <View style={styles.askButtonIcon}>
             <Ionicons name="chatbubble-ellipses" size={14} color={Colors.surface} />
           </View>
@@ -204,6 +247,12 @@ const styles = StyleSheet.create({
     height: 256,
     backgroundColor: '#E5E7EB',
   },
+  image: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
   imagePlaceholder: {
     flex: 1,
     justifyContent: 'center',
@@ -253,7 +302,7 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   factsContainer: {
-    height: 230,
+    // Remove fixed height to accommodate dynamic content
   },
   factRow: {
     flexDirection: 'row',
@@ -363,6 +412,28 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: Colors.surface,
     textAlign: 'center',
+  },
+  errorText: {
+    fontFamily: 'Plus Jakarta Sans',
+    fontSize: 18,
+    fontWeight: '600',
+    lineHeight: 22.5,
+    letterSpacing: -0.45,
+    color: Colors.text,
+    marginBottom: 20,
+  },
+  errorButton: {
+    backgroundColor: Colors.textTertiary,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+  },
+  errorButtonText: {
+    fontFamily: 'Plus Jakarta Sans',
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 20,
+    color: Colors.surface,
   },
 });
 
