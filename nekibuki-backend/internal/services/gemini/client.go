@@ -18,13 +18,14 @@ type GeminiService struct {
 
 // AttractionInfo represents the structured response from Gemini
 type AttractionInfo struct {
-	Name             string        `json:"name"`
-	Description      string        `json:"description"`
-	HistoricalInfo   string        `json:"historical_info"`
-	Significance     string        `json:"significance"`
-	InterestingFacts []string      `json:"interesting_facts"`
-	Location         *LocationInfo `json:"location,omitempty"`
-	Confidence       int           `json:"confidence"`
+	Name             string              `json:"name"`
+	Description      string              `json:"description"`
+	HistoricalInfo   string              `json:"historical_info"`
+	Significance     string              `json:"significance"`
+	InterestingFacts []string            `json:"interesting_facts"`
+	QuickFacts       []map[string]string `json:"quick_facts"`
+	Location         *LocationInfo       `json:"location,omitempty"`
+	Confidence       int                 `json:"confidence"`
 }
 
 // LocationInfo represents location details
@@ -85,6 +86,18 @@ func (g *GeminiService) AnalyzeImageAndGenerateInfo(ctx context.Context, imageDa
 				},
 				Description: "Array of interesting facts about the attraction",
 			},
+			"quick_facts": {
+				Type: "array",
+				Items: &genai.Schema{
+					Type: "object",
+					Properties: map[string]*genai.Schema{
+						"key":   {Type: "string", Description: "fact category or type"},
+						"value": {Type: "string", Description: "fact value or description"},
+					},
+					Required: []string{"key", "value"},
+				},
+				Description: "array of quick facts as key-value objects (e.g., [{key: 'Type', value: 'Historical Monument'}, {key: 'Height', value: '330m'}])",
+			},
 			"location": {
 				Type: "object",
 				Properties: map[string]*genai.Schema{
@@ -99,7 +112,7 @@ func (g *GeminiService) AnalyzeImageAndGenerateInfo(ctx context.Context, imageDa
 				Description: "Confidence score between 0 and 100",
 			},
 		},
-		Required: []string{"name", "description", "historical_info", "significance", "interesting_facts", "confidence"},
+		Required: []string{"name", "description", "historical_info", "significance", "interesting_facts", "quick_facts", "confidence"},
 	}
 
 	// Create the prompt without JSON format instructions
@@ -111,6 +124,7 @@ If you can identify a tourist attraction or landmark in the image:
 2. Be confident only if you can clearly identify the location
 3. Set confidence to a value between 0 and 100 if you can identify the attraction
 4. Set confidence to a value below 30 if you cannot clearly identify any specific attraction
+5. Generate relevant QuickFacts as an array of key-value objects that are specific to this attraction type (e.g., for buildings: Height, Year Built, Architect; for natural sites: Formation Type, Elevation, Protected Status; for historical sites: Period, UNESCO Status, Architectural Style)
 
 Focus on factual, engaging information suitable for tourists.
 `

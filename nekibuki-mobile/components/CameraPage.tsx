@@ -1,9 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform } from 'react-native';
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Camera, RotateCcw, Zap, ZapOff } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
@@ -11,17 +13,41 @@ import Animated, {
   withSequence, 
   withTiming 
 } from 'react-native-reanimated';
+import apiService from '../services/api';
 
 export default function CameraPage() {
   const [facing, setFacing] = useState<CameraType>('back');
   const [flash, setFlash] = useState<'off' | 'on'>('off');
+  const [isUploading, setIsUploading] = useState(false);
+  const [isCameraEnabled, setIsCameraEnabled] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
+  const router = useRouter();
   
   // Animation values
   const captureScale = useSharedValue(1);
   const focusOpacity = useSharedValue(0);
   const focusScale = useSharedValue(0.8);
+
+  // Handle camera lifecycle when screen gains/loses focus
+  useFocusEffect(
+    React.useCallback(() => {
+      // Screen gained focus - enable camera
+      setIsCameraEnabled(true);
+      
+      return () => {
+        // Screen lost focus - disable camera
+        setIsCameraEnabled(false);
+      };
+    }, [])
+  );
+
+  // Cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      setIsCameraEnabled(false);
+    };
+  }, []);
 
   const captureAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: captureScale.value }],
@@ -80,8 +106,10 @@ export default function CameraPage() {
       return;
     }
 
-    if (cameraRef.current) {
+    if (cameraRef.current && !isUploading && isCameraEnabled) {
       try {
+        setIsUploading(true);
+
         // Animate capture button
         captureScale.value = withSequence(
           withTiming(0.9, { duration: 100 }),
@@ -103,9 +131,23 @@ export default function CameraPage() {
           base64: false,
         });
 
-        Alert.alert('Photo captured!', `Photo saved: ${photo.uri}`);
+        // Upload photo to backend
+        const response = await apiService.uploadPhoto(photo.uri);
+        
+        // Navigate to result screen with session ID and photo URI
+        router.push({
+          pathname: '/recognition-result',
+          params: { 
+            sessionId: response.session_id,
+            photoUri: photo.uri 
+          }
+        } as any);
+
       } catch (error) {
-        Alert.alert('Error', 'Failed to take picture');
+        console.error('Photo upload error:', error);
+        Alert.alert('Error', error instanceof Error ? error.message : 'Failed to process photo');
+      } finally {
+        setIsUploading(false);
       }
     }
   };
@@ -127,18 +169,29 @@ export default function CameraPage() {
     );
 
     setTimeout(() => {
-      Alert.alert('Photo captured!', 'Discovering location...');
+      Alert.alert('Demo Mode', 'Photo upload simulation - connect to a real backend for full functionality');
     }, 500);
   };
 
   return (
     <View style={styles.container}>
-      <CameraView 
-        style={styles.camera} 
-        facing={facing}
-        flash={flash}
-        ref={cameraRef}
-      />
+      {isCameraEnabled && (
+        <CameraView 
+          style={styles.camera} 
+          facing={facing}
+          flash={flash}
+          ref={cameraRef}
+        />
+      )}
+      
+      {!isCameraEnabled && (
+        <View style={[styles.camera, styles.cameraDisabled]}>
+          <View style={styles.cameraPlaceholder}>
+            <Camera size={48} color="#6B7280" />
+            <Text style={styles.cameraPlaceholderText}>Camera Loading...</Text>
+          </View>
+        </View>
+      )}
       
       {/* Focus indicator */}
       <Animated.View style={[styles.focusIndicator, focusAnimatedStyle]}>
@@ -189,11 +242,18 @@ export default function CameraPage() {
             
             <Animated.View style={captureAnimatedStyle}>
               <TouchableOpacity
-                style={styles.captureButton}
+                style={[styles.captureButton, isUploading && styles.captureButtonDisabled]}
                 onPress={takePicture}
                 activeOpacity={0.8}
+                disabled={isUploading}
               >
-                <View style={styles.captureInner} />
+                {isUploading ? (
+                  <View style={styles.captureInner}>
+                    <View style={styles.uploadingIndicator} />
+                  </View>
+                ) : (
+                  <View style={styles.captureInner} />
+                )}
               </TouchableOpacity>
             </Animated.View>
 
@@ -218,6 +278,20 @@ const styles = StyleSheet.create({
   },
   camera: {
     flex: 1,
+  },
+  cameraDisabled: {
+    backgroundColor: '#1F2937',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cameraPlaceholder: {
+    alignItems: 'center',
+  },
+  cameraPlaceholderText: {
+    color: '#6B7280',
+    fontSize: 16,
+    fontFamily: 'Inter-Medium',
+    marginTop: 12,
   },
   permissionContainer: {
     flex: 1,
@@ -410,5 +484,19 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.3)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  captureButtonDisabled: {
+    opacity: 0.6,
+  },
+  uploadingIndicator: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    width: 20,
+    height: 20,
+    backgroundColor: '#2563EB',
+    borderRadius: 10,
+    marginLeft: -10,
+    marginTop: -10,
   },
 });

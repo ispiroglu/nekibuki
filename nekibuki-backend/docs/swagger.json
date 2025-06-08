@@ -206,6 +206,13 @@
                         "type": "string"
                     }
                 },
+                "quick_facts": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    },
+                    "description": "Key-value pairs of quick facts about the attraction"
+                },
                 "location": {
                     "$ref": "#/definitions/gemini.LocationInfo"
                 },
