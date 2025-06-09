@@ -14,6 +14,7 @@ import { useState } from 'react';
 import DiscoverPage from '../components/DiscoverPage';
 import CameraPage from '../components/CameraPage';
 import ProfilePage from '../components/ProfilePage';
+import theme from '../constants/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PAGES = 3;
@@ -112,7 +113,7 @@ export default function MainScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.primary,
   },
   pagesContainer: {
     flex: 1,
@@ -125,7 +126,7 @@ const styles = StyleSheet.create({
   },
   indicatorContainer: {
     position: 'absolute',
-    bottom: 40,
+    bottom: theme.spacing['3xl'],
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -133,15 +134,15 @@ const styles = StyleSheet.create({
   indicatorTrack: {
     width: 60,
     height: 4,
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
-    borderRadius: 2,
+    backgroundColor: theme.colors.tertiary,
+    borderRadius: theme.borderRadius.sm,
     position: 'relative',
   },
   activeIndicator: {
     position: 'absolute',
     width: 20,
     height: 4,
-    backgroundColor: '#2563EB',
-    borderRadius: 2,
+    backgroundColor: theme.colors.accent,
+    borderRadius: theme.borderRadius.sm,
   },
 });

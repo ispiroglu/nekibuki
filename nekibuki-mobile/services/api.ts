@@ -105,7 +105,6 @@ class ApiService {
       type,
     } as any);
 
-    console.log(formData);
     const response = await fetch(`${this.baseUrl}/api/recognition/upload`, {
       method: 'POST',
       headers: {
@@ -114,10 +113,7 @@ class ApiService {
       body: formData,
     });
 
-    console.log(response);
-
     if (!response.ok) {
-      console.log(response);
       const errorData: ErrorResponse = await response.json();
       throw new Error(errorData.message || `Upload failed: ${response.status}`);
     }

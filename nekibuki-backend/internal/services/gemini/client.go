@@ -124,7 +124,8 @@ If you can identify a tourist attraction or landmark in the image:
 2. Be confident only if you can clearly identify the location
 3. Set confidence to a value between 0 and 100 if you can identify the attraction
 4. Set confidence to a value below 30 if you cannot clearly identify any specific attraction
-5. Generate relevant QuickFacts as an array of key-value objects that are specific to this attraction type (e.g., for buildings: Height, Year Built, Architect; for natural sites: Formation Type, Elevation, Protected Status; for historical sites: Period, UNESCO Status, Architectural Style)
+5. Generate relevant QuickFacts as an array of key-value objects that are specific to this attraction type (e.g., for buildings: Height, Year Built, Architect; for natural sites: Formation Type, Elevation, Protected Status; for historical sites: Period, UNESCO Status, Architectural Style).
+5.1 Do not include location information in the QuickFacts.
 
 Focus on factual, engaging information suitable for tourists.
 `
