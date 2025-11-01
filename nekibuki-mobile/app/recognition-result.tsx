@@ -19,6 +19,7 @@ import { useQuery } from '@tanstack/react-query';
 import { MapPin, Clock, Star, ArrowLeft, RefreshCw, Check, Share, Bookmark, Camera } from 'lucide-react-native';
 import apiService, { RecognitionResult } from '../services/api';
 import theme from '../constants/theme';
+import FriendlyError from '../components/FriendlyError';
 
 // Get screen dimensions
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -27,6 +28,12 @@ export default function RecognitionResultScreen() {
   const { sessionId, photoUri } = useLocalSearchParams<{ sessionId: string; photoUri?: string }>();
   const router = useRouter();
   const [pollingEnabled, setPollingEnabled] = useState(true);
+  
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [modalType, setModalType] = useState<'error' | 'notFound'>('error');
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalMessage, setModalMessage] = useState('');
+  const [modalOnClose, setModalOnClose] = useState(() => () => {});
   
   // Debug log to check photoUri
   console.log('Recognition Result - photoUri:', photoUri);
@@ -60,6 +67,8 @@ export default function RecognitionResultScreen() {
     enabled: !!sessionId && pollingEnabled,
     refetchInterval: pollingEnabled ? 2000 : false,
     retry: 3,
+    retryOnMount: false,
+    refetchOnWindowFocus: false,
   });
 
   // Animate progress bar and rotate fun facts
@@ -104,8 +113,29 @@ export default function RecognitionResultScreen() {
   useEffect(() => {
     if (result && (result.status === 'completed' || result.status === 'failed')) {
       setPollingEnabled(false);
+      
+      // Handle failed state
+      if (result.status === 'failed' || (result.status === 'completed' && !result.attraction_info)) {
+        setModalType('notFound');
+        setModalTitle('Recognition Failed');
+        setModalMessage(result.error?.message || "We couldn't identify the attraction. Please try another photo.");
+        setModalOnClose(() => handleRetake);
+        setIsModalVisible(true);
+      }
     }
   }, [result]);
+
+  // Handle query error
+  useEffect(() => {
+    if (error) {
+      setPollingEnabled(false);
+      setModalType('error');
+      setModalTitle('Something Went Wrong');
+      setModalMessage(error.message);
+      setModalOnClose(() => handleRetry);
+      setIsModalVisible(true);
+    }
+  }, [error]);
 
   const handleBack = () => {
     router.back();
@@ -151,8 +181,6 @@ export default function RecognitionResultScreen() {
           </TouchableOpacity>
           <Text style={styles.loadingHeaderTitle}>Nekibuki</Text>
         </View>
-
-
 
         {/* Pagoda Illustration */}
         <View style={styles.illustrationContainer}>
@@ -261,57 +289,15 @@ export default function RecognitionResultScreen() {
     );
   }
 
-  if (isLoading && !result) {
-    return renderLoadingScreen();
-  }
+  // Always render loading or result screen, modal will overlay
+  const shouldShowLoading = isLoading || result?.status === 'processing';
+  const shouldShowResult = result?.status === 'completed' && result.attraction_info;
 
-  if (error) {
-    return (
-      <View style={styles.container}>
-        <LinearGradient colors={theme.gradients.primary as any} style={styles.errorContainer}>
-          <Text style={styles.errorTitle}>Something went wrong</Text>
-          <Text style={styles.errorText}>{error.message}</Text>
-          <View style={styles.errorActions}>
-            <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
-              <RefreshCw size={16} color={theme.colors.text.inverse} />
-              <Text style={styles.retryButtonText}>Retry</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.backButtonSimple} onPress={handleBack}>
-              <Text style={styles.backButtonText}>Go Back</Text>
-            </TouchableOpacity>
-          </View>
-        </LinearGradient>
-      </View>
-    );
-  }
-
-  if (result?.status === 'processing') {
-    return renderLoadingScreen();
-  }
-
-  if (result?.status === 'failed' || result?.error) {
-    return (
-      <View style={styles.container}>
-        <LinearGradient colors={theme.gradients.primary as any} style={styles.errorContainer}>
-          <Text style={styles.errorTitle}>Recognition Failed</Text>
-          <Text style={styles.errorText}>
-            {result.error?.message || 'Unable to identify the attraction in your photo'}
-          </Text>
-          <View style={styles.errorActions}>
-            <TouchableOpacity style={styles.retryButton} onPress={handleBack}>
-              <Text style={styles.retryButtonText}>Take Another Photo</Text>
-            </TouchableOpacity>
-          </View>
-        </LinearGradient>
-      </View>
-    );
-  }
-
-  if (result?.status === 'completed' && result.attraction_info) {
-    const attraction = result.attraction_info;
-
-    return (
-      <View style={styles.container}>
+  return (
+    <View style={styles.container}>
+      {shouldShowLoading && renderLoadingScreen()}
+      
+      {shouldShowResult && result && result.attraction_info && (
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           {/* Header */}
           <View style={styles.header}>
@@ -341,7 +327,7 @@ export default function RecognitionResultScreen() {
                     <View style={styles.confidenceBadge}>
                       <Check size={14} color={theme.colors.text.inverse} />
                       <Text style={styles.confidenceBadgeText}>
-                        {Math.floor(attraction.confidence)}% Match
+                        {Math.floor(result.attraction_info.confidence)}% Match
                       </Text>
                     </View>
                   </View>
@@ -364,9 +350,9 @@ export default function RecognitionResultScreen() {
           <View style={styles.content}>
             {/* Attraction Title */}
             <View style={styles.titleSection}>
-              <Text style={styles.attractionName}>{attraction.name}</Text>
+              <Text style={styles.attractionName}>{result.attraction_info.name}</Text>
               <Text style={styles.attractionLocation}>
-                {attraction.location.city}, {attraction.location.country}
+                {result.attraction_info.location.city}, {result.attraction_info.location.country}
               </Text>
             </View>
 
@@ -378,12 +364,12 @@ export default function RecognitionResultScreen() {
                 <View style={styles.factItem}>
                   <Text style={styles.factLabel}>Location</Text>
                   <Text style={styles.factValue}>
-                    {attraction.location.city}, {attraction.location.country}
+                    {result.attraction_info.location.city}, {result.attraction_info.location.country}
                   </Text>
                 </View>
                 
                 {/* Dynamically render quick facts from backend */}
-                {attraction.quick_facts && attraction.quick_facts.map((fact, index) => (
+                {result.attraction_info.quick_facts && result.attraction_info.quick_facts.map((fact, index) => (
                   <View key={index} style={styles.factItem}>
                     <Text style={styles.factLabel}>{fact.key}</Text>
                     <Text style={styles.factValue}>{fact.value}</Text>
@@ -395,15 +381,15 @@ export default function RecognitionResultScreen() {
             {/* About Section */}
             <View style={styles.aboutSection}>
               <Text style={styles.sectionTitle}>About</Text>
-              <Text style={styles.description}>{attraction.description}</Text>
+              <Text style={styles.description}>{result.attraction_info.description}</Text>
               
-              {attraction.historical_info && (
-                <Text style={styles.historicalInfo}>{attraction.historical_info}</Text>
+              {result.attraction_info.historical_info && (
+                <Text style={styles.historicalInfo}>{result.attraction_info.historical_info}</Text>
               )}
 
-              {attraction.interesting_facts && attraction.interesting_facts.length > 0 && (
+              {result.attraction_info.interesting_facts && result.attraction_info.interesting_facts.length > 0 && (
                 <View style={styles.factsContainer}>
-                  {attraction.interesting_facts.map((fact, index) => (
+                  {result.attraction_info.interesting_facts.map((fact, index) => (
                     <View key={index} style={styles.interestingFactItem}>
                       <Text style={styles.factBullet}>•</Text>
                       <Text style={styles.factText}>{fact}</Text>
@@ -414,42 +400,30 @@ export default function RecognitionResultScreen() {
             </View>
           </View>
         </ScrollView>
+      )}
 
-        {/* Bottom Actions */}
-        <View style={styles.bottomActions}>
-          <View style={styles.actionButtons}>
-            <TouchableOpacity style={styles.actionButton} onPress={handleRetake}>
-              <Camera size={20} color={theme.colors.text.primary} />
-              <Text style={styles.actionButtonText}>Retake</Text>
+      {/* Fallback for when not loading and no result */}
+      {!shouldShowLoading && !shouldShowResult && !isModalVisible && (
+        <View style={styles.container}>
+          <LinearGradient colors={theme.gradients.primary as any} style={styles.errorContainer}>
+            <Text style={styles.errorText}>No results available</Text>
+            <TouchableOpacity style={styles.backButtonSimple} onPress={handleBack}>
+              <Text style={styles.backButtonText}>Go Back</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
-              <Share size={20} color={theme.colors.text.primary} />
-              <Text style={styles.actionButtonText}>Share</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-              <Bookmark size={20} color={theme.colors.text.inverse} />
-              <Text style={styles.saveButtonText}>Save</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <TouchableOpacity style={styles.askButton} onPress={handleAskNekibuki}>
-            <Text style={styles.askButtonText}>Ask Nekibuki</Text>
-          </TouchableOpacity>
+          </LinearGradient>
         </View>
-      </View>
-    );
-  }
+      )}
 
-  return (
-    <View style={styles.container}>
-      <LinearGradient colors={theme.gradients.primary as any} style={styles.errorContainer}>
-        <Text style={styles.errorText}>No results available</Text>
-        <TouchableOpacity style={styles.backButtonSimple} onPress={handleBack}>
-          <Text style={styles.backButtonText}>Go Back</Text>
-        </TouchableOpacity>
-      </LinearGradient>
+      <FriendlyError 
+        visible={isModalVisible}
+        onClose={() => {
+          setIsModalVisible(false);
+          modalOnClose();
+        }}
+        type={modalType}
+        title={modalTitle}
+        message={modalMessage}
+      />
     </View>
   );
 }

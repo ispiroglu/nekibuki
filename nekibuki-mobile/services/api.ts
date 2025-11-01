@@ -72,7 +72,7 @@ export interface HealthResponse {
 }
 
 // Configuration
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.2.221:8080';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.14:8080';
 
 class ApiService {
   private baseUrl: string;

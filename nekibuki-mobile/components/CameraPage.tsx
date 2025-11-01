@@ -16,6 +16,7 @@ import Animated, {
 import * as FileSystem from 'expo-file-system';
 import apiService from '../services/api';
 import theme from '../constants/theme';
+import FriendlyError from './FriendlyError';
 
 export default function CameraPage() {
   const [facing, setFacing] = useState<CameraType>('back');
@@ -25,6 +26,9 @@ export default function CameraPage() {
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
   const router = useRouter();
+  
+  const [isErrorModalVisible, setIsErrorModalVisible] = useState(false);
+  const [errorModalMessage, setErrorModalMessage] = useState('');
   
   // Cleanup old photos on component mount
   useEffect(() => {
@@ -98,7 +102,7 @@ export default function CameraPage() {
   const styles = StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: theme.colors.primary, // Use theme primary color as polaroid background
+      backgroundColor: theme.colors.secondary, // Use theme primary color as polaroid background
     },
     polaroidContainer: {
       flex: 1,
@@ -496,7 +500,9 @@ export default function CameraPage() {
 
       } catch (error) {
         console.error('Photo upload error:', error);
-        Alert.alert('Error', error instanceof Error ? error.message : 'Failed to process photo');
+        const message = error instanceof Error ? error.message : 'Failed to process photo';
+        setErrorModalMessage(message);
+        setIsErrorModalVisible(true);
       } finally {
         setIsUploading(false);
       }
@@ -522,6 +528,11 @@ export default function CameraPage() {
     setTimeout(() => {
       Alert.alert('Demo Mode', 'Photo upload simulation - connect to a real backend for full functionality');
     }, 500);
+  };
+
+  const closeErrorModal = () => {
+    setIsErrorModalVisible(false);
+    setErrorModalMessage('');
   };
 
   return (
@@ -586,24 +597,29 @@ export default function CameraPage() {
       {/* Stage 2: Bottom Controls Section - Positioned absolutely above navigator */}
       <View style={styles.bottomSection}>
         <View style={styles.controlsRow}>
-          <Animated.View style={captureAnimatedStyle}>
+          <Animated.View style={[captureAnimatedStyle]}>
             <TouchableOpacity
-              style={[styles.captureButton, isUploading && styles.captureButtonDisabled]}
               onPress={takePicture}
+              style={[styles.captureButton, (isUploading || !isCameraEnabled) && styles.captureButtonDisabled]}
+              disabled={isUploading || !isCameraEnabled}
               activeOpacity={0.8}
-              disabled={isUploading}
             >
-              {isUploading ? (
-                <View style={styles.captureInner}>
-                  <View style={styles.uploadingIndicator} />
-                </View>
-              ) : (
-                <View style={styles.captureInner} />
+              <View style={styles.captureInner} />
+              {isUploading && (
+                <Animated.View style={[styles.uploadingIndicator, focusAnimatedStyle]} />
               )}
             </TouchableOpacity>
           </Animated.View>
         </View>
       </View>
+
+      <FriendlyError 
+        visible={isErrorModalVisible}
+        onClose={closeErrorModal}
+        type="error"
+        title="Upload Failed"
+        message={errorModalMessage}
+      />
     </View>
   );
 }
