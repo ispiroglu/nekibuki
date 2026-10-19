@@ -3,55 +3,61 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * Design language:
+ *   warm paper background, near-black ink, a single clay accent,
+ *   Newsreader for anything editorial, system sans for chrome,
+ *   14px base radius with a multiplicative scale.
+ */
 :root {
-  --background: #f6f2e9;
-  --foreground: #201d18;
-  --card: #fcf9f3;
-  --card-foreground: #201d18;
-  --popover: #fffdf8;
-  --popover-foreground: #201d18;
-  --primary: #bd5b3d;
-  --primary-foreground: #fff8f1;
-  --secondary: #ebe4d6;
-  --secondary-foreground: #3b342a;
-  --muted: #ece7db;
-  --muted-foreground: #786f61;
-  --accent: #e8ded0;
-  --accent-foreground: #2c261e;
-  --destructive: #ad4237;
-  --destructive-foreground: #fff8f1;
-  --border: #e1d8c8;
-  --input: #d8cdb9;
-  --ring: #bd5b3d;
-  --radius: 1.375rem;
-  --glass: rgba(250, 247, 240, 0.72);
+  --background: #faf9f5;
+  --foreground: #141413;
+  --card: #ffffff;
+  --card-foreground: #141413;
+  --popover: #ffffff;
+  --popover-foreground: #141413;
+  --primary: #141413;
+  --primary-foreground: #faf9f5;
+  --secondary: #f0eee6;
+  --secondary-foreground: #141413;
+  --muted: #f0eee6;
+  --muted-foreground: #73726c;
+  --accent: #e8e6dc;
+  --accent-foreground: #141413;
+  --clay: #d97757;
+  --destructive: #c4472f;
+  --destructive-foreground: #faf9f5;
+  --border: #e8e6dc;
+  --input: #e0ded3;
+  --ring: #d97757;
+  --radius: 0.875rem;
   --glass-border: rgba(255, 255, 255, 0.55);
-  --shadow-ambient: 0 1px 2px rgba(32, 29, 24, 0.05), 0 12px 32px -16px rgba(32, 29, 24, 0.22);
+  --shadow-ambient: 0 1px 2px rgba(20, 20, 19, 0.04), 0 12px 32px -22px rgba(20, 20, 19, 0.28);
 }
 
 .dark {
-  --background: #171512;
-  --foreground: #f4efe5;
-  --card: #201e19;
-  --card-foreground: #f4efe5;
-  --popover: #24211b;
-  --popover-foreground: #f4efe5;
-  --primary: #e08a68;
-  --primary-foreground: #2a1810;
-  --secondary: #2b2822;
-  --secondary-foreground: #ede6d9;
-  --muted: #2a2721;
-  --muted-foreground: #a89e8e;
-  --accent: #332f28;
-  --accent-foreground: #f1ebdf;
-  --destructive: #d0685c;
-  --destructive-foreground: #2a100c;
-  --border: #342f28;
-  --input: #3b352d;
-  --ring: #e08a68;
-  --glass: rgba(26, 24, 20, 0.7);
+  --background: #1f1e1d;
+  --foreground: #faf9f5;
+  --card: #2a2927;
+  --card-foreground: #faf9f5;
+  --popover: #2a2927;
+  --popover-foreground: #faf9f5;
+  --primary: #faf9f5;
+  --primary-foreground: #141413;
+  --secondary: #30302e;
+  --secondary-foreground: #faf9f5;
+  --muted: #30302e;
+  --muted-foreground: #a3a199;
+  --accent: #3a3936;
+  --accent-foreground: #faf9f5;
+  --clay: #d97757;
+  --destructive: #c4472f;
+  --destructive-foreground: #faf9f5;
+  --border: rgba(250, 249, 245, 0.09);
+  --input: rgba(250, 249, 245, 0.14);
+  --ring: #d97757;
   --glass-border: rgba(255, 255, 255, 0.08);
-  --shadow-ambient: 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 40px -20px rgba(0, 0, 0, 0.7);
+  --shadow-ambient: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 40px -24px rgba(0, 0, 0, 0.7);
 }
 
 @theme inline {
@@ -69,22 +75,23 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-clay: var(--clay);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  --radius-sm: calc(var(--radius) - 0.75rem);
-  --radius-md: calc(var(--radius) - 0.5rem);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 0.5rem);
-  --radius-2xl: calc(var(--radius) + 1rem);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
 
   --font-sans:
-    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, 'Helvetica Neue',
-    sans-serif;
-  --font-serif: 'Newsreader Variable', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+    system-ui, -apple-system, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  --font-serif: 'Newsreader Variable', ui-serif, Georgia, serif;
 
   --shadow-ambient: var(--shadow-ambient);
 }
@@ -96,8 +103,6 @@
 
   html {
     -webkit-text-size-adjust: 100%;
-    -webkit-font-smoothing: antialiased;
-    text-rendering: optimizeLegibility;
     height: 100%;
   }
 
@@ -109,9 +114,12 @@
     font-family: var(--font-sans);
     font-size: 16px;
     line-height: 1.5;
-    letter-spacing: -0.006em;
-    overscroll-behavior-y: none;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
+    overscroll-behavior-y: none;
   }
 
   button,
@@ -119,8 +127,16 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  input,
+  textarea {
+    font: inherit;
+    /* Keep text editable inside containers that opt out of selection (swipe deck). */
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
   ::selection {
-    background: color-mix(in srgb, var(--primary) 24%, transparent);
+    background: color-mix(in srgb, var(--clay) 26%, transparent);
   }
 
   :focus-visible {
@@ -128,43 +144,61 @@
     outline-offset: 2px;
   }
 
-  input,
-  textarea {
-    font: inherit;
-    /* Keep text editable inside containers that opt out of selection (swipe deck). */
-    user-select: text;
-  }
-
   h1,
   h2,
   h3 {
     font-family: var(--font-serif);
+    font-optical-sizing: auto;
     font-weight: 500;
-    letter-spacing: -0.021em;
-    line-height: 1.08;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    text-wrap: balance;
   }
 }
 
-@utility glass {
-  background: var(--glass);
-  -webkit-backdrop-filter: blur(22px) saturate(1.6);
-  backdrop-filter: blur(22px) saturate(1.6);
-  border: 1px solid var(--glass-border);
+/* Editorial headings and place names. */
+@utility display {
+  font-family: var(--font-serif);
+  font-optical-sizing: auto;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
 }
 
+/* Small caps label: 12px, medium, wide tracking. */
+@utility label-caps {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Glass over the page (sticky headers, sheets). */
+@utility glass {
+  background: var(--background);
+
+  @supports (color: color-mix(in lab, red, red)) {
+    background: color-mix(in srgb, var(--background) 72%, transparent);
+  }
+
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  backdrop-filter: blur(24px) saturate(1.8);
+}
+
+/* Glass over the viewfinder. */
 @utility glass-dark {
-  background: rgba(18, 17, 15, 0.58);
-  -webkit-backdrop-filter: blur(22px) saturate(1.4);
-  backdrop-filter: blur(22px) saturate(1.4);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(20, 20, 19, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  backdrop-filter: blur(20px) saturate(1.8);
 }
 
 @utility safe-top {
-  padding-top: max(0.75rem, env(safe-area-inset-top));
+  padding-top: max(env(safe-area-inset-top), 0.75rem);
 }
 
 @utility safe-bottom {
-  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  padding-bottom: max(env(safe-area-inset-bottom), 1rem);
 }
 
 @utility no-scrollbar {
@@ -181,35 +215,15 @@
   -webkit-overflow-scrolling: touch;
 }
 
+/* Overlay text sitting directly on a photograph. */
 @utility text-photo {
-  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.55), 0 1px 2px rgba(0, 0, 0, 0.4);
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 30px rgba(0, 0, 0, 0.35);
 }
 
-@layer components {
-  .grain::after {
-    content: '';
-    position: fixed;
-    inset: 0;
-    z-index: 80;
-    pointer-events: none;
-    opacity: 0.028;
-    mix-blend-mode: multiply;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  }
-
-  .dark .grain::after {
-    mix-blend-mode: screen;
-    opacity: 0.05;
-  }
-
-  .scroll-fade {
-    -webkit-mask-image: linear-gradient(to bottom, transparent, #000 18px);
-    mask-image: linear-gradient(to bottom, transparent, #000 18px);
-  }
-
-  .hairline-top {
-    box-shadow: inset 0 1px 0 var(--glass-border);
-  }
+@utility scroll-fade-b {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 12px);
+  mask-image: linear-gradient(to bottom, transparent, #000 12px);
 }
 
 @keyframes nk-fade-in {

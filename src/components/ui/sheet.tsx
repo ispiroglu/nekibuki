@@ -63,22 +63,20 @@ export function Sheet({
             exit={reduceMotion ? { opacity: 0 } : { y: '100%' }}
             transition={{ type: 'spring', bounce: 0.06, duration: 0.5 }}
             className={cn(
-              'absolute inset-x-0 bottom-0 flex max-h-[92dvh] flex-col overflow-hidden rounded-t-[1.75rem] border border-b-0 border-border/70 bg-background shadow-[0_-24px_60px_-30px_rgba(0,0,0,.4)]',
+              'absolute inset-x-0 bottom-0 flex max-h-[92dvh] flex-col overflow-hidden rounded-t-3xl bg-background',
               className,
             )}
           >
             <div
               onPointerDown={(event) => dragControls.start(event)}
-              className="flex shrink-0 cursor-grab touch-none flex-col items-center gap-3 px-5 pb-3 pt-3 active:cursor-grabbing"
+              className="flex shrink-0 cursor-grab touch-none flex-col items-center gap-3 px-5 pt-3 pb-3 active:cursor-grabbing"
             >
               <span className="h-1.5 w-10 rounded-full bg-muted-foreground/25" />
               {(title || description) && (
                 <div className="w-full text-center">
-                  {title && (
-                    <h2 className="font-serif text-lg font-medium tracking-[-0.01em]">{title}</h2>
-                  )}
+                  {title && <h2 className="display text-xl font-medium">{title}</h2>}
                   {description && (
-                    <p className="mt-0.5 text-[13px] text-muted-foreground">{description}</p>
+                    <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
                   )}
                 </div>
               )}

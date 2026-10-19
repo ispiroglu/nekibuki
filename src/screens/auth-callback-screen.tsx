@@ -14,10 +14,8 @@ export function AuthCallbackScreen() {
   return (
     <div className="grid min-h-dvh place-items-center bg-background px-8 text-center">
       <div className="flex flex-col items-center gap-4">
-        <span className="grid size-14 place-items-center rounded-3xl bg-primary text-primary-foreground">
-          <Logo className="size-7 animate-breathe" />
-        </span>
-        <h1 className="font-serif text-2xl">Signing you in…</h1>
+        <Logo className="size-16 animate-breathe text-foreground" />
+        <h1 className="display text-2xl">Signing you in…</h1>
         <p className="max-w-xs text-sm text-muted-foreground">
           Hold on while we bring your discoveries back.
         </p>

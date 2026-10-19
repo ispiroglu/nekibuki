@@ -31,7 +31,7 @@ export const DialogContent = forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed left-1/2 top-1/2 z-[91] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-[var(--radius-xl)] border border-border/70 bg-popover p-6 text-popover-foreground shadow-ambient data-[state=closed]:animate-[nk-pop-out_140ms_ease-in] data-[state=open]:animate-[nk-pop-in_220ms_cubic-bezier(.16,1,.3,1)]',
+        'fixed left-1/2 top-1/2 z-[91] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-popover p-6 text-popover-foreground shadow-[0_0_0_1px_var(--border),0_30px_80px_-40px_rgba(0,0,0,.4)] data-[state=closed]:animate-[nk-pop-out_140ms_ease-in] data-[state=open]:animate-[nk-pop-in_220ms_cubic-bezier(.16,1,.3,1)]',
         className,
       )}
       {...props}

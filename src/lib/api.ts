@@ -9,7 +9,7 @@ import type {
 } from '@shared/types'
 import { sleep } from './utils'
 
-const MOCK_FALLBACK = import.meta.env.VITE_MOCK_ANALYSIS !== 'false'
+const MOCK_FALLBACK = import.meta.env.VITE_MOCK_ANALYSIS === 'true'
 
 export class ApiError extends Error {
   code: string

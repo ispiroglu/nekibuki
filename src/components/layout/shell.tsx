@@ -19,9 +19,9 @@ function PageSkeleton() {
   return (
     <div className="h-full space-y-4 overflow-hidden bg-background px-5 safe-top">
       <Skeleton className="mt-10 h-9 w-2/3" />
-      <Skeleton className="h-20 w-full rounded-[1.75rem]" />
-      <Skeleton className="h-20 w-full rounded-3xl" />
-      <Skeleton className="h-20 w-full rounded-3xl" />
+      <Skeleton className="h-20 w-full rounded-2xl" />
+      <Skeleton className="h-20 w-full rounded-2xl" />
+      <Skeleton className="h-20 w-full rounded-2xl" />
     </div>
   )
 }
@@ -74,6 +74,9 @@ export function Shell() {
           location={location}
           locationStatus={locationStatus}
           onRequestLocation={requestLocation}
+          onClearLocation={() => useLocationStore.getState().reset()}
+          onOpenProfile={() => setScreenIndex(0)}
+          onOpenHistory={() => setScreenIndex(2)}
         />
         <Suspense fallback={<PageSkeleton />}>
           <HistoryScreen onOpenCamera={() => setScreenIndex(1)} />
@@ -86,6 +89,7 @@ export function Shell() {
         <PageDots
           index={screenIndex}
           onSelect={setScreenIndex}
+          tone={screenIndex === 1 ? 'dark' : 'light'}
           className="pointer-events-auto"
         />
       </div>

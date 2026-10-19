@@ -73,18 +73,131 @@ export async function createPreviewDataUrl(blob: Blob): Promise<string | null> {
   })
 }
 
-/** Grabs the current video frame as a JPEG blob. */
+/** Pixel rect of the video source that is actually visible under `object-cover`. */
+export interface CoverSourceRect {
+  /** Source space. */
+  x: number
+  y: number
+  width: number
+  height: number
+  /** Intrinsic-to-display scale used for the cover fit. */
+  scale: number
+}
+
+/**
+ * Reproduces CSS `object-cover` math for a source painted into a target box.
+ * The source is scaled by `max(target/source)` and the overflow is cropped evenly
+ * on both axes, which is exactly what the viewfinder shows.
+ */
+export function coverSourceRect(
+  sourceWidth: number,
+  sourceHeight: number,
+  targetWidth: number,
+  targetHeight: number,
+): CoverSourceRect | null {
+  if (!sourceWidth || !sourceHeight || !targetWidth || !targetHeight) return null
+
+  const scale = Math.max(targetWidth / sourceWidth, targetHeight / sourceHeight)
+  const width = Math.min(sourceWidth, targetWidth / scale)
+  const height = Math.min(sourceHeight, targetHeight / scale)
+
+  return {
+    x: (sourceWidth - width) / 2,
+    y: (sourceHeight - height) / 2,
+    width,
+    height,
+    scale,
+  }
+}
+
+function cropForViewfinder(video: HTMLVideoElement): CoverSourceRect | null {
+  const source = coverSourceRect(
+    video.videoWidth,
+    video.videoHeight,
+    video.clientWidth,
+    video.clientHeight,
+  )
+  if (!source) return null
+
+  // Integer source rect keeps drawImage edge handling predictable across browsers.
+  const width = Math.max(1, Math.round(source.width))
+  const height = Math.max(1, Math.round(source.height))
+  return {
+    x: Math.max(0, Math.round((video.videoWidth - width) / 2)),
+    y: Math.max(0, Math.round((video.videoHeight - height) / 2)),
+    width,
+    height,
+    scale: source.scale,
+  }
+}
+
+/** Grabs the current video frame as a JPEG blob, cropped to the visible viewfinder. */
 export function captureVideoFrame(video: HTMLVideoElement, quality = 0.92): Promise<Blob | null> {
-  const width = video.videoWidth
-  const height = video.videoHeight
-  if (!width || !height) return Promise.resolve(null)
+  if (!video.videoWidth || !video.videoHeight) return Promise.resolve(null)
+
+  const crop = cropForViewfinder(video)
+  const width = crop?.width ?? video.videoWidth
+  const height = crop?.height ?? video.videoHeight
 
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
   const context = canvas.getContext('2d')
   if (!context) return Promise.resolve(null)
-  context.drawImage(video, 0, 0, width, height)
+  context.drawImage(
+    video,
+    crop?.x ?? 0,
+    crop?.y ?? 0,
+    width,
+    height,
+    0,
+    0,
+    width,
+    height,
+  )
 
   return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob), 'image/jpeg', quality))
 }
+
+/**
+ * A small still of the current viewfinder, used to hide the black gap while the
+ * camera restarts. Same crop as the saved photo, just at preview resolution.
+ */
+export function captureVideoStill(
+  video: HTMLVideoElement,
+  maxWidth = 640,
+  quality = 0.62,
+): string | null {
+  if (!video.videoWidth || !video.videoHeight) return null
+
+  const crop = cropForViewfinder(video)
+  const sourceWidth = crop?.width ?? video.videoWidth
+  const sourceHeight = crop?.height ?? video.videoHeight
+  const scale = Math.min(1, maxWidth / sourceWidth)
+  const width = Math.max(1, Math.round(sourceWidth * scale))
+  const height = Math.max(1, Math.round(sourceHeight * scale))
+
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const context = canvas.getContext('2d')
+  if (!context) return null
+  context.drawImage(
+    video,
+    crop?.x ?? 0,
+    crop?.y ?? 0,
+    sourceWidth,
+    sourceHeight,
+    0,
+    0,
+    width,
+    height,
+  )
+
+  try {
+    return canvas.toDataURL('image/jpeg', quality)
+  } catch {
+    return null
+  }
+}
+

@@ -50,7 +50,7 @@ export function App() {
     <AuthProvider>
       <BrowserRouter>
         <AppearanceSync />
-        <div className="grain min-h-dvh">
+        <div className="min-h-dvh">
           <Screens />
         </div>
         <Toaster
@@ -59,7 +59,7 @@ export function App() {
           toastOptions={{
             classNames: {
               toast:
-                'rounded-2xl border border-border/70 bg-popover text-popover-foreground shadow-ambient',
+                'rounded-2xl bg-popover text-popover-foreground shadow-[0_0_0_1px_var(--border),0_20px_50px_-30px_rgba(0,0,0,.4)]',
               description: 'text-muted-foreground',
             },
           }}

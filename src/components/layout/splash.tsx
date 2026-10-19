@@ -10,12 +10,8 @@ export function SplashScreen() {
         transition={{ type: 'spring', bounce: 0.1, duration: 0.6 }}
         className="flex flex-col items-center gap-4"
       >
-        <span className="grid size-14 place-items-center rounded-3xl bg-primary text-primary-foreground">
-          <Logo className="size-7 animate-breathe" />
-        </span>
-        <p className="font-serif text-[15px] tracking-[-0.01em] text-muted-foreground">
-          Finding your guide…
-        </p>
+        <Logo className="size-16 animate-breathe text-foreground" />
+        <p className="display text-lg text-muted-foreground">Finding your guide…</p>
       </motion.div>
     </div>
   )

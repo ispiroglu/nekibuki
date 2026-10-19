@@ -1,125 +1,163 @@
 import type { VisualReference } from '@shared/types'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { X } from 'lucide-react'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
+
+/**
+ * The captured photo with tappable annotations.
+ * Annotations are laid out in the upper band of the photo — the report's
+ * article rises over the bottom of the frame.
+ */
+const MARKER_BAND = 0.72
 
 export function PhotoHero({
   imageUrl,
   references,
-  children,
 }: {
   imageUrl: string
   references: VisualReference[]
-  children: ReactNode
 }) {
   const [activeId, setActiveId] = useState<string | null>(null)
   const [hintVisible, setHintVisible] = useState(true)
+  const markerRef = useRef<HTMLButtonElement | null>(null)
+  const reduceMotion = useReducedMotion()
   const active = references.find((reference) => reference.id === activeId) ?? null
+
+  const close = useCallback(() => {
+    setActiveId(null)
+    const marker = markerRef.current
+    if (marker) marker.focus({ preventScroll: true })
+  }, [])
 
   useEffect(() => {
     const timer = window.setTimeout(() => setHintVisible(false), 7000)
     return () => window.clearTimeout(timer)
   }, [])
 
+  useEffect(() => {
+    if (!active) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.stopPropagation()
+        close()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [active, close])
+
   return (
-    <div className="relative h-[60svh] min-h-[380px] w-full overflow-hidden bg-secondary">
-      <img
-        src={imageUrl}
-        alt=""
-        decoding="async"
-        className="absolute inset-0 size-full object-cover"
-      />
+    <>
+      <div className="relative h-[60vh] min-h-[420px] w-full overflow-hidden bg-secondary">
+        <img
+          src={imageUrl}
+          alt=""
+          decoding="async"
+          className="absolute inset-0 size-full object-cover"
+        />
 
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/55 via-black/5 to-transparent" />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[55%] bg-gradient-to-t from-black/85 via-black/40 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/45 to-transparent" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-background to-transparent" />
 
-      {references.map((reference, index) => {
-        const isActive = reference.id === activeId
-        return (
-          <button
-            key={reference.id}
-            type="button"
-            aria-label={reference.title}
-            onClick={() => {
-              setHintVisible(false)
-              setActiveId(isActive ? null : reference.id)
-            }}
-            style={{ left: `${reference.x * 100}%`, top: `${reference.y * 100}%` }}
-            className="absolute -translate-x-1/2 -translate-y-1/2"
-          >
-            <span
-              className={cn(
-                'relative grid size-7 place-items-center rounded-full border text-[11px] font-semibold backdrop-blur-md transition-all duration-300',
-                isActive
-                  ? 'scale-110 border-amber-100 bg-amber-300 text-black shadow-[0_0_0_6px_rgba(252,211,77,0.22)]'
-                  : 'border-white/60 bg-black/40 text-white',
-              )}
+        {references.map((reference, index) => {
+          const isActive = reference.id === activeId
+          return (
+            <button
+              key={reference.id}
+              type="button"
+              aria-label={reference.title}
+              onClick={(event) => {
+                setHintVisible(false)
+                if (isActive) {
+                  setActiveId(null)
+                } else {
+                  markerRef.current = event.currentTarget
+                  setActiveId(reference.id)
+                }
+              }}
+              style={{
+                left: `${reference.x * 100}%`,
+                top: `${Math.min(reference.y, MARKER_BAND) * 100}%`,
+              }}
+              className="absolute -translate-x-1/2 -translate-y-1/2"
             >
-              {index + 1}
-              {!isActive && (
-                <span className="absolute inset-0 animate-ping rounded-full border border-white/50 [animation-duration:2.6s]" />
-              )}
-            </span>
-          </button>
-        )
-      })}
+              <span
+                className={cn(
+                  'relative grid size-9 place-items-center rounded-full text-[13px] font-semibold tabular-nums transition-all duration-300',
+                  isActive
+                    ? 'scale-110 bg-clay text-white'
+                    : 'glass-dark text-white',
+                )}
+              >
+                {index + 1}
+                {!isActive && (
+                  <span className="absolute inset-0 animate-ping rounded-full border border-white/40 [animation-duration:2.6s]" />
+                )}
+              </span>
+            </button>
+          )
+        })}
 
-      <AnimatePresence>
-        {hintVisible && !active && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            className="glass-dark absolute left-1/2 top-20 -translate-x-1/2 rounded-full px-3.5 py-1.5 text-[12px] font-medium text-white/90"
-          >
-            Tap the dots on your photo
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <div className="absolute inset-x-0 bottom-0 p-5">
-        <AnimatePresence mode="wait" initial={false}>
-          {active ? (
+        <AnimatePresence>
+          {hintVisible && !active && (
             <motion.div
-              key="reference"
-              initial={{ opacity: 0, y: 16, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 10, scale: 0.98 }}
-              transition={{ type: 'spring', bounce: 0.05, duration: 0.4 }}
-              className="glass-dark rounded-3xl p-4 text-white"
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="glass-dark absolute left-1/2 top-20 -translate-x-1/2 rounded-full px-3.5 py-1.5 text-xs font-medium whitespace-nowrap text-white"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/60">
-                    In the frame
-                  </p>
-                  <h3 className="mt-1 font-serif text-[21px] leading-tight">{active.title}</h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setActiveId(null)}
-                  className="grid size-7 shrink-0 place-items-center rounded-full bg-white/12 text-white/80"
-                  aria-label="Close detail"
-                >
-                  <X className="size-3.5" />
-                </button>
-              </div>
-              <p className="mt-2 text-[13.5px] leading-relaxed text-white/85">{active.body}</p>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="meta"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.18 }}
-            >
-              {children}
+              Tap the dots on your photo
             </motion.div>
           )}
         </AnimatePresence>
       </div>
-    </div>
+
+      <AnimatePresence>
+        {active && (
+          <motion.div
+            key="annotation-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.2 }}
+            aria-hidden
+            onClick={close}
+            className="fixed inset-0 z-40"
+          />
+        )}
+        {active && (
+          <motion.div
+            key="annotation-panel"
+            initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 20 }}
+            animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+            exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 16 }}
+            transition={
+              reduceMotion ? { duration: 0.01 } : { type: 'spring', bounce: 0.05, duration: 0.4 }
+            }
+            className="fixed inset-x-0 bottom-0 z-50 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+          >
+            <div className="glass-dark mx-auto max-w-md rounded-3xl p-4 text-white">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="label-caps text-white/60">In the frame</p>
+                  <h3 className="display mt-1 text-xl">{active.title}</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={close}
+                  className="grid size-8 shrink-0 place-items-center rounded-full bg-white/15 text-white"
+                  aria-label="Close detail"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+              <p className="mt-2 text-sm leading-relaxed text-white/85">{active.body}</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   )
 }

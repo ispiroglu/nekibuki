@@ -90,7 +90,7 @@ const markers = await page.locator('button[aria-label]:has(span)').count()
 const dots = await page.locator('img[alt=""] ~ button').count()
 check('photo annotations rendered', markers >= 4 || dots >= 4, `${markers} markers`)
 
-const matchChip = await page.getByText(/%\s*match/).count()
+const matchChip = await page.getByText(/confidence|%\s*match/i).count()
 check('confidence chip rendered', matchChip > 0)
 
 // ----------------------------------------------------------------------- chat
@@ -128,8 +128,9 @@ await page.waitForTimeout(1500)
 await page.getByRole('tab', { name: 'Places' }).click()
 await page.waitForTimeout(1500)
 await shot('smoke-06-history')
-const stats = await page.getByText(/discoveries/).first().innerText()
-check('history shows the new capture', /[1-9]/.test(stats) || /^\d/.test(stats), stats)
+const rows = await page.locator('ul li button').count()
+const firstRow = rows > 0 ? (await page.locator('ul li button').first().innerText()).trim() : ''
+check('history lists your places', rows >= 1, `${rows} rows · ${firstRow.replace(/\n+/g, ' · ')}`)
 
 await browser.close()
 

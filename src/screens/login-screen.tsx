@@ -1,8 +1,7 @@
 import { motion } from 'motion/react'
-import { Loader2, ShieldCheck } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { useState } from 'react'
 import { Logo } from '@/components/brand/logo'
-import { Button } from '@/components/ui/button'
 import { useAuth } from '@/lib/auth'
 import { spring } from '@/lib/motion'
 
@@ -34,87 +33,54 @@ export function LoginScreen() {
   const [pending, setPending] = useState(false)
 
   return (
-    <div className="relative flex min-h-dvh flex-col overflow-hidden bg-background">
-      <div className="pointer-events-none absolute -left-24 -top-24 size-[26rem] rounded-full bg-primary/12 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-28 -right-20 size-[24rem] rounded-full bg-amber-500/10 blur-3xl" />
+    <div className="flex min-h-dvh flex-col bg-background px-6 safe-top safe-bottom">
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={spring}
+        className="flex flex-1 flex-col justify-center"
+      >
+        <p className="display text-lg text-clay">Nekibuki</p>
+        <Logo className="mt-6 size-20 text-foreground" draw />
+        <h1 className="display mt-10 text-[3.25rem] font-medium">
+          A quiet guide for the places you <em className="not-italic text-clay">walk past</em>.
+        </h1>
+        <p className="mt-5 max-w-xs text-lg leading-relaxed text-muted-foreground">
+          Point your camera at a monument, a landscape or a corner of a city. Nekibuki tells you what
+          it is, what to look at, and four things worth remembering.
+        </p>
+      </motion.div>
 
-      <div className="relative z-10 mx-auto grid w-full max-w-6xl flex-1 items-center gap-10 px-6 py-10 md:grid-cols-2 md:gap-16">
-        <motion.div
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={spring}
-          className="flex flex-col items-start"
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ ...spring, delay: 0.06 }}
+        className="pb-2"
+      >
+        {error && <p className="pb-3 text-sm text-destructive">{error}</p>}
+
+        <button
+          type="button"
+          disabled={pending || loading}
+          onClick={async () => {
+            setPending(true)
+            try {
+              await signIn()
+            } finally {
+              setPending(false)
+            }
+          }}
+          className="flex h-14 w-full items-center justify-center gap-3 rounded-full bg-primary text-[1.05rem] font-medium text-primary-foreground transition-transform duration-150 ease-out active:scale-[0.98] disabled:opacity-80"
         >
-          <div className="flex items-center gap-3">
-            <span className="grid size-11 place-items-center rounded-2xl bg-primary text-primary-foreground">
-              <Logo className="size-6" />
-            </span>
-            <span className="font-serif text-[22px] tracking-[-0.02em]">Nekibuki</span>
-          </div>
+          {pending ? <Loader2 className="size-5 animate-spin" /> : <GoogleMark className="size-5" />}
+          Continue with Google
+        </button>
 
-          <h1 className="mt-8 max-w-md font-serif text-[42px] leading-[1.03] tracking-[-0.03em] md:text-[54px]">
-            A quiet guide for the places you walk past.
-          </h1>
-          <p className="mt-5 max-w-sm text-[15.5px] leading-relaxed text-muted-foreground">
-            Point your camera at a monument, a landscape or a corner of a city. Nekibuki tells you
-            what it is, what to look at, and four things worth remembering.
-          </p>
-
-          <div className="mt-9 w-full max-w-sm space-y-3">
-            <Button
-              variant="secondary"
-              size="lg"
-              className="h-13 w-full bg-card shadow-ambient"
-              disabled={pending || loading}
-              onClick={async () => {
-                setPending(true)
-                try {
-                  await signIn()
-                } finally {
-                  setPending(false)
-                }
-              }}
-            >
-              {pending ? (
-                <Loader2 className="size-4.5 animate-spin" />
-              ) : (
-                <GoogleMark className="size-4.5" />
-              )}
-              Continue with Google
-            </Button>
-
-            {error && <p className="text-[13px] text-destructive">{error}</p>}
-
-            <p className="flex items-start gap-2 pt-1 text-[12px] leading-relaxed text-muted-foreground">
-              <ShieldCheck className="mt-0.5 size-3.5 shrink-0" />
-              Sign in is required to keep your discoveries and conversations in one place.
-              {mode === 'mock' && ' This build runs in demo mode — no Google account is contacted.'}
-            </p>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, scale: 0.96 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ ...spring, delay: 0.08 }}
-          className="relative hidden aspect-[4/5] w-full overflow-hidden rounded-[2.5rem] border border-border/60 shadow-ambient md:block"
-        >
-          <img
-            src="https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=1200&q=80"
-            alt="The Eiffel Tower beside the Seine"
-            className="size-full object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-transparent to-transparent" />
-          <div className="absolute inset-x-5 bottom-5 text-white">
-            <p className="text-[11.5px] font-semibold uppercase tracking-[0.16em] text-white/70">
-              Paris · 1887–1889
-            </p>
-            <p className="mt-1 font-serif text-[26px] leading-tight">
-              Built as a temporary gate. It never left.
-            </p>
-          </div>
-        </motion.div>
-      </div>
+        <p className="mt-4 text-center text-xs text-muted-foreground">
+          By continuing you agree to our Terms and Privacy Policy.
+          {mode === 'mock' && ' Demo mode — no Google account is contacted.'}
+        </p>
+      </motion.div>
     </div>
   )
 }

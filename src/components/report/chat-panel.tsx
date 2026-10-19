@@ -19,11 +19,13 @@ export function ChatPanel({ analysis }: { analysis: Analysis }) {
   const [messages, setMessages] = useState<ChatMessage[]>(analysis.messages)
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
+  const [failedQuestion, setFailedQuestion] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     setMessages(analysis.messages)
+    setFailedQuestion(null)
   }, [analysis.id, analysis.messages])
 
   useEffect(() => {
@@ -41,6 +43,7 @@ export function ChatPanel({ analysis }: { analysis: Analysis }) {
 
     haptic('light', hapticsEnabled)
     const previous = messages
+    setFailedQuestion(null)
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -68,10 +71,12 @@ export function ChatPanel({ analysis }: { analysis: Analysis }) {
       }
       const final = [...withUser, assistantMessage]
       setMessages(final)
+      setFailedQuestion(null)
       await repository?.updateMessages(analysis.id, final)
       bumpHistory()
     } catch (error) {
-      setMessages(previous)
+      setMessages(withUser)
+      setFailedQuestion(question)
       toast.error(error instanceof ApiError ? error.message : 'The guide could not answer.')
     } finally {
       setSending(false)
@@ -80,13 +85,13 @@ export function ChatPanel({ analysis }: { analysis: Analysis }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div ref={scrollRef} className="min-h-0 flex-1 space-y-3.5 overflow-y-auto px-5 py-4">
+      <div ref={scrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
         {messages.length === 0 && (
           <div className="space-y-4 py-2 text-center">
-            <div className="mx-auto grid size-12 place-items-center rounded-full bg-primary/10 text-primary">
+            <div className="mx-auto grid size-12 place-items-center rounded-full bg-secondary text-clay">
               <Sparkles className="size-5" />
             </div>
-            <p className="mx-auto max-w-[19rem] text-[14px] leading-relaxed text-muted-foreground">
+            <p className="mx-auto max-w-[19rem] text-sm leading-relaxed text-muted-foreground">
               Ask anything about {analysis.report.title}. I know the details in your photo.
             </p>
             <div className="flex flex-wrap justify-center gap-2 pt-1">
@@ -95,7 +100,7 @@ export function ChatPanel({ analysis }: { analysis: Analysis }) {
                   key={question}
                   type="button"
                   onClick={() => void send(question)}
-                  className="rounded-full border border-border bg-card px-3.5 py-2 text-[12.5px] text-foreground transition-colors hover:bg-secondary active:scale-[0.97]"
+                  className="rounded-full bg-secondary px-3.5 py-2 text-sm text-foreground transition-transform duration-150 ease-out active:scale-[0.97]"
                 >
                   {question}
                 </button>
@@ -112,26 +117,40 @@ export function ChatPanel({ analysis }: { analysis: Analysis }) {
             transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
             className={cn('flex', message.role === 'user' ? 'justify-end' : 'justify-start')}
           >
-            <div
-              className={cn(
-                'max-w-[85%] rounded-[1.35rem] px-4 py-2.5 text-[14px] leading-relaxed',
-                message.role === 'user'
-                  ? 'rounded-br-lg bg-primary text-primary-foreground'
-                  : 'rounded-bl-lg border border-border/70 bg-card text-foreground',
-              )}
-            >
-              {message.content}
-            </div>
+            {message.role === 'user' ? (
+              <div className="ml-auto w-fit max-w-[80%] rounded-3xl rounded-br-lg bg-primary px-4 py-2.5 text-sm leading-relaxed text-primary-foreground">
+                {message.content}
+              </div>
+            ) : (
+              <p className="max-w-[88%] font-serif text-[1.05rem] leading-relaxed">
+                {message.content}
+              </p>
+            )}
           </motion.div>
         ))}
 
+        {failedQuestion && (
+          <div className="flex justify-end">
+            <div className="flex w-fit max-w-[80%] flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl bg-secondary px-3.5 py-2 text-sm text-muted-foreground">
+              <span>No answer — the guide could not reach the server.</span>
+              <button
+                type="button"
+                onClick={() => void send(failedQuestion)}
+                className="shrink-0 font-medium text-destructive underline-offset-2 active:underline"
+              >
+                Try again
+              </button>
+            </div>
+          </div>
+        )}
+
         {sending && (
           <div className="flex justify-start">
-            <div className="flex items-center gap-1 rounded-[1.35rem] rounded-bl-lg border border-border/70 bg-card px-4 py-3">
+            <div className="flex items-center gap-1 py-2">
               {[0, 1, 2].map((dot) => (
                 <motion.span
                   key={dot}
-                  className="size-1.5 rounded-full bg-muted-foreground"
+                  className="size-1.5 rounded-full bg-clay"
                   animate={{ opacity: [0.25, 1, 0.25], y: [0, -2, 0] }}
                   transition={{ duration: 1, repeat: Infinity, delay: dot * 0.16 }}
                 />
@@ -141,14 +160,17 @@ export function ChatPanel({ analysis }: { analysis: Analysis }) {
         )}
       </div>
 
-      <div className="safe-bottom border-t border-border/60 bg-background/90 px-3.5 pt-3 backdrop-blur-xl">
-        <div className="flex items-end gap-2">
+      <div className="glass scroll-fade-b px-3 pt-3 safe-bottom">
+        <div className="flex items-end gap-2 rounded-3xl bg-card p-1 shadow-sm">
           <textarea
             ref={inputRef}
             value={input}
             data-no-swipe
             rows={1}
-            onChange={(event) => setInput(event.target.value)}
+            onChange={(event) => {
+              setInput(event.target.value)
+              setFailedQuestion(null)
+            }}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault()
@@ -156,16 +178,16 @@ export function ChatPanel({ analysis }: { analysis: Analysis }) {
               }
             }}
             placeholder="Ask a question…"
-            className="max-h-32 min-h-11 flex-1 resize-none rounded-[1.35rem] border border-border bg-card px-4 py-3 text-[14px] leading-snug outline-none transition-colors focus-visible:border-primary/60"
+            className="max-h-32 min-h-10 flex-1 resize-none bg-transparent py-2.5 pl-3 text-[16px] leading-snug outline-none placeholder:text-muted-foreground"
           />
           <button
             type="button"
             onClick={() => void send(input)}
             disabled={!input.trim() || sending}
-            className="grid size-11 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground transition-transform active:scale-95 disabled:opacity-40"
+            className="grid size-10 shrink-0 place-items-center rounded-full bg-clay text-white transition-transform duration-150 ease-out active:scale-95 disabled:opacity-40"
             aria-label="Send"
           >
-            <ArrowUp className="size-4.5" />
+            <ArrowUp className="size-5" />
           </button>
         </div>
       </div>

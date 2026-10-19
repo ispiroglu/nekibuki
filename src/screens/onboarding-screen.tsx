@@ -1,116 +1,127 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
-import { ArrowRight } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { Logo } from '@/components/brand/logo'
-import { Button } from '@/components/ui/button'
 import { useAuth } from '@/lib/auth'
 import { spring } from '@/lib/motion'
 import { cn } from '@/lib/utils'
 import { usePreferences } from '@/store/preferences'
 
 interface Slide {
-  eyebrow: string
   title: string
   body: string
   art: ReactNode
 }
 
-function CameraArt() {
+/** Four quarter-round brackets, the way a viewfinder frames a subject. */
+function ViewfinderArt() {
   return (
-    <div className="relative grid size-56 place-items-center">
-      <span className="absolute size-56 rounded-full border border-primary/15" />
-      <span className="absolute size-44 rounded-full border border-primary/25" />
-      <span className="absolute size-32 rounded-full bg-primary/10 blur-xl" />
+    <div className="relative grid size-52 place-items-center">
+      <svg viewBox="0 0 120 120" fill="none" aria-hidden className="absolute inset-0 size-full">
+        <g stroke="var(--clay)" strokeWidth="4" strokeLinecap="round">
+          <path d="M10 40A30 30 0 0 1 40 10" />
+          <path d="M80 10A30 30 0 0 1 110 40" />
+          <path d="M110 80A30 30 0 0 1 80 110" />
+          <path d="M40 110A30 30 0 0 1 10 80" />
+        </g>
+      </svg>
       <motion.span
-        animate={{ rotate: [0, 6, -6, 0] }}
-        transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
-        className="relative grid size-24 place-items-center rounded-[2rem] bg-primary text-primary-foreground shadow-ambient"
+        animate={{ scale: [1, 1.05, 1] }}
+        transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut' }}
+        className="text-foreground/15"
       >
-        <Logo className="size-12" />
+        <Logo className="size-16" />
       </motion.span>
-      <span className="absolute bottom-6 size-3 rounded-full bg-amber-400" />
     </div>
   )
 }
 
-function TriviaArt() {
-  const cards = [
-    { label: 'Completed in', value: '1889', rotate: -3 },
-    { label: 'Designed by', value: 'Gustave Eiffel', rotate: 2.5 },
-    { label: 'Meant to be', value: 'Temporary', rotate: 2 },
-    { label: 'Repainted', value: 'Every 7 years', rotate: -2.5 },
+/** One discovery: the photo, then the facts that come back with it. */
+function DiscoveryArt() {
+  const facts = [
+    { label: 'Opened', value: '80 AD' },
+    { label: 'Capacity', value: '~50,000' },
   ]
   return (
-    <div className="grid size-56 grid-cols-2 grid-rows-2 gap-2.5">
-      {cards.map((card, index) => (
-        <motion.div
-          key={card.label}
-          initial={{ opacity: 0, y: 14, rotate: 0, scale: 0.94 }}
-          animate={{ opacity: 1, y: 0, rotate: card.rotate, scale: 1 }}
-          transition={{ ...spring, delay: 0.07 * index }}
-          className={cn(
-            'flex flex-col justify-between rounded-2xl border border-border/70 bg-card p-3 text-left shadow-ambient',
-            index % 2 === 0 ? 'origin-bottom-right' : 'origin-bottom-left',
-          )}
-        >
-          <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-            {card.label}
-          </p>
-          <p className="mt-1 font-serif text-[15px] leading-tight">{card.value}</p>
-        </motion.div>
-      ))}
-    </div>
-  )
-}
-
-function ChatArt() {
-  return (
-    <div className="relative grid size-56 place-items-center">
-      <div className="absolute left-1/2 top-4 h-36 w-40 -translate-x-1/2 overflow-hidden rounded-[1.5rem] border border-border/60 shadow-ambient">
+    <motion.div
+      initial={{ opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={spring}
+      className="w-52 rounded-2xl bg-card p-2 shadow-[0_0_0_1px_var(--border)]"
+    >
+      <div className="relative h-28 overflow-hidden rounded-xl bg-secondary">
         <img
           src="https://images.unsplash.com/photo-1552832230-c0197dd311b5?auto=format&fit=crop&w=600&q=80"
           alt=""
           className="size-full object-cover"
         />
       </div>
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ ...spring, delay: 0.2 }}
-        className="absolute bottom-14 left-3 max-w-[70%] rounded-2xl rounded-bl-md border border-border/70 bg-card px-3 py-2 text-[11px] shadow-ambient"
+      <dl className="mt-2 grid grid-cols-2 gap-1.5">
+        {facts.map((fact, index) => (
+          <motion.div
+            key={fact.label}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ ...spring, delay: 0.12 + index * 0.08 }}
+            className="rounded-xl bg-secondary px-2.5 py-2"
+          >
+            <dt className="text-[0.6rem] font-medium uppercase tracking-[0.06em] text-muted-foreground">
+              {fact.label}
+            </dt>
+            <dd className="display mt-0.5 text-base leading-snug">{fact.value}</dd>
+          </motion.div>
+        ))}
+      </dl>
+    </motion.div>
+  )
+}
+
+/** The conversation that stays attached to a place. */
+function ConversationArt() {
+  return (
+    <div className="w-64 space-y-3">
+      <motion.p
+        initial={{ opacity: 0, x: 12 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={spring}
+        className="ml-auto w-fit rounded-3xl rounded-br-lg bg-primary px-4 py-2.5 text-sm text-primary-foreground"
       >
-        Why was it almost demolished?
-      </motion.div>
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
+        Who built this?
+      </motion.p>
+      <motion.p
+        initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ ...spring, delay: 0.34 }}
-        className="absolute bottom-4 right-2 max-w-[74%] rounded-2xl rounded-br-md bg-primary px-3 py-2 text-[11px] text-primary-foreground shadow-ambient"
+        transition={{ ...spring, delay: 0.16 }}
+        className="font-serif text-[1.05rem] leading-relaxed"
       >
-        Radio antennas saved it. ✨
-      </motion.div>
+        Genoese merchants, in 1348 — as the crown of their walled colony.
+      </motion.p>
+      <motion.p
+        initial={{ opacity: 0, x: 12 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ ...spring, delay: 0.3 }}
+        className="ml-auto w-fit rounded-3xl rounded-br-lg bg-primary px-4 py-2.5 text-sm text-primary-foreground"
+      >
+        Can I go up at night?
+      </motion.p>
     </div>
   )
 }
 
 const SLIDES: Slide[] = [
   {
-    eyebrow: 'Point · Shoot · Understand',
-    title: 'Look at a place. Really look at it.',
-    body: 'Nekibuki watches what your camera sees — a monument, a landscape, a quiet street — and tells you what it is in seconds.',
-    art: <CameraArt />,
+    title: 'Point at anything',
+    body: 'A tower, a fountain, a carved doorway. Snap it or pick a photo — no typing, no searching.',
+    art: <ViewfinderArt />,
   },
   {
-    eyebrow: 'Four small surprises',
-    title: 'Stories, not a textbook.',
-    body: 'Every place arrives with four cards: who built it, when, why, and the detail most people walk straight past.',
-    art: <TriviaArt />,
+    title: 'The story, not the plaque',
+    body: 'Every place arrives with a short guide written for you, plus four things worth remembering.',
+    art: <DiscoveryArt />,
   },
   {
-    eyebrow: 'A guide that remembers',
-    title: 'Ask, and come back later.',
-    body: 'Each discovery is saved with its conversation, so you can revisit the place — and the question you never finished asking.',
-    art: <ChatArt />,
+    title: 'Ask, and come back later',
+    body: 'Each discovery keeps its own conversation, so you can revisit the place and the question you left open.',
+    art: <ConversationArt />,
   },
 ]
 
@@ -131,23 +142,16 @@ export function OnboardingScreen() {
   }
 
   const slide = SLIDES[index]
+  const firstName = user?.name?.trim().split(/\s+/)[0] || 'Traveler'
 
   return (
-    <div className="relative flex min-h-dvh flex-col overflow-hidden bg-background">
-      <div className="pointer-events-none absolute -left-24 top-0 size-[22rem] rounded-full bg-primary/10 blur-3xl" />
-      <div className="pointer-events-none absolute -right-24 bottom-0 size-[22rem] rounded-full bg-amber-500/10 blur-3xl" />
-
-      <header className="relative z-10 flex items-center justify-between px-6 safe-top">
-        <div className="flex items-center gap-2.5">
-          <span className="grid size-9 place-items-center rounded-xl bg-primary text-primary-foreground">
-            <Logo className="size-5" />
-          </span>
-          <span className="font-serif text-[18px] tracking-[-0.02em]">Nekibuki</span>
-        </div>
+    <div className="flex min-h-dvh flex-col overflow-hidden bg-background">
+      <header className="flex items-center justify-between px-6 safe-top">
+        <p className="display text-lg text-clay">Welcome, {firstName}.</p>
         <button
           type="button"
           onClick={finish}
-          className="rounded-full px-3 py-2 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+          className="-mr-2 px-2 py-2 text-sm text-muted-foreground transition-colors active:text-foreground"
         >
           Skip
         </button>
@@ -161,7 +165,7 @@ export function OnboardingScreen() {
           if (info.offset.x < -70 || info.velocity.x < -520) go(index + 1)
           else if (info.offset.x > 70 || info.velocity.x > 520) go(index - 1)
         }}
-        className="relative z-10 flex flex-1 flex-col items-center justify-center px-7 pb-6"
+        className="flex flex-1 flex-col px-6 pb-8"
       >
         <AnimatePresence mode="wait" initial={false} custom={direction}>
           <motion.div
@@ -171,27 +175,20 @@ export function OnboardingScreen() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: direction * -40 }}
             transition={spring}
-            className="flex flex-col items-center text-center"
+            className="flex min-h-0 flex-1 flex-col justify-center"
           >
-            <div className="mb-2">{slide.art}</div>
-            <p className="text-[11.5px] font-semibold uppercase tracking-[0.18em] text-primary">
-              {slide.eyebrow}
-            </p>
-            <h1 className="mt-3 max-w-sm font-serif text-[33px] leading-[1.06] tracking-[-0.025em]">
-              {slide.title}
-            </h1>
-            <p className="mt-4 max-w-sm text-[15px] leading-relaxed text-muted-foreground">
-              {slide.body}
-            </p>
+            <div className="flex flex-1 items-center justify-center py-6">{slide.art}</div>
+            <h1 className="display text-[2.6rem] font-medium">{slide.title}</h1>
+            <p className="mt-3 text-lg leading-relaxed text-muted-foreground">{slide.body}</p>
           </motion.div>
         </AnimatePresence>
       </motion.div>
 
-      <div className="relative z-10 flex flex-col items-center gap-6 px-7 safe-bottom">
+      <div className="flex items-center justify-between px-6 safe-bottom">
         <div className="flex items-center gap-2">
           {SLIDES.map((item, dotIndex) => (
             <button
-              key={item.eyebrow}
+              key={item.title}
               type="button"
               aria-label={`Slide ${dotIndex + 1}`}
               onClick={() => go(dotIndex)}
@@ -202,14 +199,13 @@ export function OnboardingScreen() {
             />
           ))}
         </div>
-        <Button
-          size="lg"
-          className="h-13 w-full max-w-sm"
+        <button
+          type="button"
           onClick={() => (index === SLIDES.length - 1 ? finish() : go(index + 1))}
+          className="h-14 rounded-full bg-primary px-7 font-medium text-primary-foreground transition-transform duration-150 ease-out active:scale-[0.98]"
         >
           {index === SLIDES.length - 1 ? 'Start exploring' : 'Continue'}
-          <ArrowRight className="size-4" />
-        </Button>
+        </button>
       </div>
     </div>
   )

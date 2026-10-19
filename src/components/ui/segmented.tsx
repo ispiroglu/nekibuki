@@ -24,7 +24,7 @@ export function Segmented<T extends string>({
     <div
       role="radiogroup"
       className={cn(
-        'inline-flex items-center gap-1 rounded-full border border-border/70 bg-secondary/50 p-1',
+        'inline-flex items-center gap-1 rounded-full bg-secondary p-1',
         className,
       )}
     >
@@ -39,13 +39,13 @@ export function Segmented<T extends string>({
             onClick={() => onChange(option.value)}
             className={cn(
               'relative inline-flex h-8 items-center justify-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium transition-colors duration-200',
-              active ? 'text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
+              active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
             )}
           >
             {active && (
               <motion.span
                 layoutId={layoutId}
-                className="absolute inset-0 rounded-full bg-primary"
+                className="absolute inset-0 rounded-full bg-card shadow-[0_0_0_1px_var(--border)]"
                 transition={{ type: 'spring', bounce: 0.12, duration: 0.42 }}
               />
             )}

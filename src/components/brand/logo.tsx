@@ -1,31 +1,51 @@
+import { motion } from 'motion/react'
 import { cn } from '@/lib/utils'
 
-export function Logo({ className }: { className?: string }) {
+/**
+ * The Nekibuki mark: an aperture ring with a clay core.
+ * Pass `draw` to play the opening animation (login / splash).
+ */
+export function Logo({
+  className,
+  draw = false,
+  delay = 0,
+}: {
+  className?: string
+  draw?: boolean
+  delay?: number
+}) {
   return (
-    <svg viewBox="0 0 32 32" fill="none" aria-hidden className={cn('size-6', className)}>
-      {[0, 60, 120, 180, 240, 300].map((angle) => (
-        <path
-          key={angle}
-          d="M16 4A12 12 0 0 1 23.71 6.81"
-          transform={`rotate(${angle} 16 16)`}
-          stroke="currentColor"
-          strokeWidth="2.6"
-          strokeLinecap="round"
-        />
-      ))}
-      <circle cx="16" cy="16" r="3.4" fill="currentColor" />
+    <svg viewBox="0 0 120 120" fill="none" aria-hidden className={cn('size-6', className)}>
+      <motion.circle
+        cx="60"
+        cy="60"
+        r="44"
+        stroke="currentColor"
+        strokeWidth="7"
+        strokeLinecap="round"
+        pathLength={1}
+        strokeDasharray={1}
+        initial={draw ? { strokeDashoffset: 1, opacity: 0.2 } : false}
+        animate={draw ? { strokeDashoffset: 0, opacity: 1 } : undefined}
+        transition={{ duration: 1.1, delay, ease: [0.32, 0.72, 0, 1] }}
+      />
+      <motion.circle
+        cx="60"
+        cy="60"
+        r="17"
+        className="fill-clay"
+        initial={draw ? { scale: 0.4, opacity: 0 } : false}
+        animate={draw ? { scale: 1, opacity: 1 } : undefined}
+        style={{ transformOrigin: '50% 50%', transformBox: 'fill-box' }}
+        transition={{ duration: 0.7, delay: delay + 0.25, ease: [0.32, 0.72, 0, 1] }}
+      />
     </svg>
   )
 }
 
 export function Wordmark({ className }: { className?: string }) {
   return (
-    <span
-      className={cn(
-        'font-serif text-[17px] font-medium tracking-[-0.015em] text-foreground',
-        className,
-      )}
-    >
+    <span className={cn('display text-[17px] font-medium text-foreground', className)}>
       Nekibuki
     </span>
   )
