@@ -1,2 +1,0 @@
-- [ ] Cancel the incoming session.
-- [ ] Accept location information and pass it in to the prompt

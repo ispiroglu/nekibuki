@@ -1,0 +1,14 @@
+# Copy to .dev.vars (never commit .dev.vars)
+
+# mock | gemini
+VISION_PROVIDER=mock
+
+# Get one at https://aistudio.google.com/apikey
+GEMINI_API_KEY=
+
+# Any vision-capable Gemini model can be swapped in here
+GEMINI_MODEL=gemini-2.5-flash
+
+# Used to verify Supabase access tokens at the edge (optional in mock mode)
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
