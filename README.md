@@ -1,5 +1,8 @@
 # Nekibuki
 
+**Live:** <https://nekibuki.thecrafter.io> — runs on the mock vision provider, so no API keys are
+needed to try the full flow.
+
 Point your camera at a monument, a landscape, a street. Nekibuki identifies what it is and
 hands back a short guide that **refers to what is actually in your photo** — a brief intro,
 four trivia cards, then detailed sections with the detail you are looking at called out.
@@ -123,8 +126,10 @@ a carousel library, so the animation stays interruptible mid-swipe.
 ## Tooling
 
 - `bun run icons` — regenerates the PWA icons in `public/` from the aperture mark drawn in code.
-- `node scripts/screenshot.mjs` — walks the whole app with Playwright and writes screenshots to
-  `SHOT_DIR` (needs a dev server on :5173).
+- `bun run shots` — walks every screen with Playwright and writes screenshots to `SHOT_DIR`
+  (needs a dev server on :5173).
+- `bun run smoke` — end-to-end check: sign in, capture, read the report, ask a question, confirm
+  it reached history. Point it anywhere with `BASE_URL=https://nekibuki.thecrafter.io`.
 
 ## Status
 

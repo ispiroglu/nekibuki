@@ -14,6 +14,8 @@
     "deploy": "bun run build && wrangler deploy",
     "typecheck": "wrangler types && tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.worker.json && tsc --noEmit -p tsconfig.node.json",
     "icons": "bun scripts/generate-icons.mjs",
+    "shots": "bun scripts/screenshot.mjs",
+    "smoke": "bun scripts/smoke.mjs",
     "types": "wrangler types",
     "db:migration": "echo 'Run supabase/migrations/0001_init.sql in the Supabase SQL editor'"
   },
