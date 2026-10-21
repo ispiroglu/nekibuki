@@ -202,14 +202,14 @@ export function ChatPanel({ analysis }: { analysis: Analysis }) {
                 void send(input)
               }
             }}
-            placeholder="Ask a question…"
+            placeholder={`Ask about ${analysis.report.title}…`}
             className="field-sizing-content max-h-32 min-h-10 flex-1 resize-none bg-transparent py-2.5 pl-3 text-[16px] leading-snug outline-none placeholder:text-muted-foreground"
           />
           <button
             type="button"
             onClick={() => void send(input)}
             disabled={!input.trim() || sending}
-            className="grid size-10 shrink-0 place-items-center rounded-full bg-brand text-brand-fg transition-transform duration-150 ease-out active:scale-95 disabled:opacity-40"
+            className="grid size-11 shrink-0 place-items-center rounded-full bg-brand text-brand-fg transition-transform duration-150 ease-out active:scale-95 disabled:opacity-40"
             aria-label="Send"
           >
             <ArrowUp className="size-5" />

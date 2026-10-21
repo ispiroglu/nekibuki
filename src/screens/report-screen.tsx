@@ -277,19 +277,17 @@ export function ReportScreen() {
           className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm text-muted-foreground"
         >
           <span className="inline-flex items-center gap-1.5">
-            <MapPin className="size-3.5" />
+            <MapPin className="size-3.5" aria-hidden />
             {report.location.name}, {report.location.country}
           </span>
-          <span className="text-border">·</span>
-          <span>{report.era}</span>
-          <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs">
-            {confidenceLabel}
+          <span aria-hidden className="text-border">
+            ·
           </span>
-          {analysis.saved && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-xs">
-              <Bookmark className="size-3 fill-current" /> Saved
-            </span>
-          )}
+          <span>{report.era}</span>
+          <span aria-hidden className="text-border">
+            ·
+          </span>
+          <span className="whitespace-nowrap">{confidenceLabel}</span>
         </motion.div>
 
         <motion.p
@@ -327,11 +325,11 @@ export function ReportScreen() {
           <ol className="mt-4 space-y-4">
             {report.visualReferences.map((reference, index) => (
               <li key={reference.id} className="flex gap-3">
-                <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-brand text-[11px] font-semibold text-brand-fg">
+                <span className="mt-0 grid size-7 shrink-0 place-items-center rounded-full bg-brand text-xs font-semibold text-brand-fg tabular-nums">
                   {index + 1}
                 </span>
-                <div>
-                  <h3 className="font-serif text-xl leading-snug">{reference.title}</h3>
+                <div className="min-w-0">
+                  <h3 className="font-serif text-xl leading-snug break-words">{reference.title}</h3>
                   <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                     {reference.body}
                   </p>
