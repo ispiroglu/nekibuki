@@ -71,7 +71,7 @@ await wait(6000) // let the swipe hint fade out
 await shot('06-camera-clean')
 
 // -------------------------------------------------------------------- history
-await page.getByRole('tab', { name: 'Places' }).click()
+await page.getByRole('button', { name: 'Places', exact: true }).click()
 await wait(1400)
 await shot('07-history')
 
@@ -108,7 +108,7 @@ await wait(700)
 // ------------------------------------------------------------------- profile
 await page.goto(`${BASE}/`, { waitUntil: 'networkidle' })
 await wait(1200)
-await page.getByRole('tab', { name: 'You' }).click()
+await page.getByRole('button', { name: 'You', exact: true }).click()
 await wait(1200)
 await shot('13-profile')
 
@@ -116,7 +116,7 @@ await page.getByRole('radio', { name: 'Dark' }).click()
 await wait(1200)
 await shot('14-profile-dark')
 
-await page.getByRole('tab', { name: 'Places' }).click()
+await page.getByRole('button', { name: 'Places', exact: true }).click()
 await wait(1000)
 await shot('15-history-dark')
 

@@ -59,7 +59,7 @@ export function AnalyzingOverlay({
         >
           <img src={previewUrl} alt="" className="size-full object-cover" />
           {!error && !reduceMotion && (
-            <span className="animate-scan pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-transparent via-clay/50 to-transparent" />
+            <span className="animate-scan pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-transparent via-hud/50 to-transparent" />
           )}
           <span className="pointer-events-none absolute inset-0 rounded-3xl ring-1 ring-white/15 ring-inset" />
           <div className="pointer-events-none absolute inset-0 grid place-items-center">
@@ -86,7 +86,7 @@ export function AnalyzingOverlay({
           <>
             <div className="mt-4 h-1 w-40 overflow-hidden rounded-full bg-white/15">
               <motion.div
-                className="h-full w-1/3 rounded-full bg-clay"
+                className="h-full w-1/3 rounded-full bg-hud"
                 animate={{ x: ['-120%', '320%'] }}
                 transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
               />

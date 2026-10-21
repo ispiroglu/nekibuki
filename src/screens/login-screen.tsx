@@ -40,10 +40,10 @@ export function LoginScreen() {
         transition={spring}
         className="flex flex-1 flex-col justify-center"
       >
-        <p className="display text-lg text-clay">Nekibuki</p>
+        <p className="display text-lg text-brand-ink">Nekibuki</p>
         <Logo className="mt-6 size-20 text-foreground" draw />
         <h1 className="display mt-10 text-[3.25rem] font-medium">
-          A quiet guide for the places you <em className="not-italic text-clay">walk past</em>.
+          A quiet guide for the places you <em className="not-italic text-brand-ink">walk past</em>.
         </h1>
         <p className="mt-5 max-w-xs text-lg leading-relaxed text-muted-foreground">
           Point your camera at a monument, a landscape or a corner of a city. Nekibuki tells you what

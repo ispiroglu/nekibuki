@@ -14,7 +14,7 @@ const buttonVariants = cva(
         ghost: 'text-foreground hover:bg-secondary',
         glass: 'glass text-foreground',
         destructive: 'bg-card text-destructive shadow-[0_0_0_1px_var(--border)]',
-        link: 'text-clay underline-offset-4 hover:underline active:scale-100',
+        link: 'text-brand-ink underline-offset-4 hover:underline active:scale-100',
       },
       size: {
         default: 'h-11 px-5',

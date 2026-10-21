@@ -2,7 +2,7 @@ import type { GeoPoint } from '@shared/types'
 import { create } from 'zustand'
 import { getCurrentLocation } from '@/lib/geo'
 
-type LocationStatus = 'idle' | 'requesting' | 'ready' | 'off'
+type LocationStatus = 'idle' | 'requesting' | 'ready' | 'off' | 'disabled'
 
 interface LocationState {
   location: GeoPoint | null
@@ -20,5 +20,7 @@ export const useLocationStore = create<LocationState>((set, get) => ({
     const result = await getCurrentLocation()
     set({ location: result, status: result ? 'ready' : 'off' })
   },
-  reset: () => set({ location: null, status: 'idle' }),
+  // `disabled` is deliberate: the shell only auto-requests on `idle`, so clearing
+  // location must not fall back to a status that triggers a fresh request.
+  reset: () => set({ location: null, status: 'disabled' }),
 }))

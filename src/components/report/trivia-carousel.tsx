@@ -71,7 +71,10 @@ export function TriviaCarousel({ trivia }: { trivia: Trivia[] }) {
       <div
         ref={scrollerRef}
         onScroll={syncScroll}
-        className="-mx-6 flex snap-row gap-3 overflow-x-auto px-6 pb-2 no-scrollbar md:mx-0 md:grid md:grid-cols-2 md:overflow-visible md:px-0"
+        tabIndex={0}
+        role="region"
+        aria-label="Trivia cards"
+        className="-mx-6 flex snap-row gap-3 overflow-x-auto overscroll-x-contain scroll-px-6 px-6 pb-2 no-scrollbar md:mx-0 md:grid md:grid-cols-2 md:overflow-visible md:px-0"
       >
         {trivia.map((item, index) => {
           const Icon = ICONS[item.icon] ?? Sparkles
@@ -90,7 +93,7 @@ export function TriviaCarousel({ trivia }: { trivia: Trivia[] }) {
                 </span>
               </div>
               <p className="label-caps mt-4 text-muted-foreground">{item.label}</p>
-              <h3 className="display mt-1 text-2xl">{item.title}</h3>
+              <h3 className="display mt-1 text-xl">{item.title}</h3>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.body}</p>
             </motion.article>
           )

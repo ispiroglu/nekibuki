@@ -17,7 +17,7 @@ const DAY_RANK: Record<ReturnType<typeof groupDay>, number> = {
 }
 
 export function HistoryScreen({ onOpenCamera }: { onOpenCamera: () => void }) {
-  const { analyses, loading, error } = useHistory()
+  const { analyses, loading, error, refresh } = useHistory()
   const [query, setQuery] = useState('')
   const [savedOnly, setSavedOnly] = useState(false)
 
@@ -54,7 +54,7 @@ export function HistoryScreen({ onOpenCamera }: { onOpenCamera: () => void }) {
         <div className="mt-4 flex items-center gap-2">
           <label
             htmlFor="history-search"
-            className="flex h-11 flex-1 items-center gap-2 rounded-xl bg-secondary px-3 text-muted-foreground"
+            className="flex h-11 flex-1 items-center gap-2 rounded-xl bg-secondary px-3 text-muted-foreground focus-within:ring-2 focus-within:ring-ring"
           >
             <Search className="size-4 shrink-0" aria-hidden />
             <Input
@@ -62,7 +62,7 @@ export function HistoryScreen({ onOpenCamera }: { onOpenCamera: () => void }) {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search your places"
-              className="flex-1"
+              className="flex-1 rounded-none focus-visible:ring-0 focus-visible:ring-offset-0"
               data-no-swipe
             />
           </label>
@@ -98,8 +98,20 @@ export function HistoryScreen({ onOpenCamera }: { onOpenCamera: () => void }) {
       )}
 
       {!loading && error && (
-        <div className="px-3 pt-2">
-          <p className="rounded-2xl bg-secondary p-4 text-sm text-muted-foreground">{error}</p>
+        <div
+          role="alert"
+          className="mx-3 mt-2 flex flex-col items-start gap-3 rounded-2xl bg-secondary p-4"
+        >
+          <p className="text-sm text-muted-foreground">
+            We couldn’t load your places. Check your connection and try again.
+          </p>
+          <button
+            type="button"
+            onClick={() => void refresh()}
+            className="inline-flex min-h-11 items-center justify-center rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground active:scale-[0.97]"
+          >
+            Try again
+          </button>
         </div>
       )}
 
@@ -116,13 +128,24 @@ export function HistoryScreen({ onOpenCamera }: { onOpenCamera: () => void }) {
               ? 'Point your camera at a monument, a landscape or a street corner and this is where it lives.'
               : 'Try another word, or clear the filters.'}
           </p>
-          {analyses.length === 0 && (
+          {analyses.length === 0 ? (
             <button
               type="button"
               onClick={onOpenCamera}
               className="mt-6 inline-flex h-12 items-center gap-2 rounded-full bg-primary px-6 font-medium text-primary-foreground active:scale-[0.97]"
             >
               <Camera className="size-4" /> Open the camera
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setQuery('')
+                setSavedOnly(false)
+              }}
+              className="mt-6 inline-flex h-12 items-center justify-center rounded-full bg-secondary px-6 font-medium text-foreground active:scale-[0.97]"
+            >
+              Clear filters
             </button>
           )}
         </div>

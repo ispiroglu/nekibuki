@@ -13,7 +13,8 @@ import {
   Zap,
   ZapOff,
 } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { toast } from 'sonner'
 import { Logo } from '@/components/brand/logo'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -54,7 +55,7 @@ function applyAdvanced(track: MediaStreamTrack, constraint: AdvancedConstraint) 
 /**
  * Whether a tap can actually move focus. `getCapabilities()` is the honest signal:
  * iOS Safari exposes no `focusMode`, so tap-to-focus is a no-op there and we must
- * not draw the amber ring.
+ * not draw the brand focus ring.
  */
 function focusSupport(track: MediaStreamTrack): 'supported' | 'unsupported' | 'unknown' {
   if (typeof track.getCapabilities !== 'function') return 'unknown'
@@ -73,6 +74,8 @@ function focusSupport(track: MediaStreamTrack): 'supported' | 'unsupported' | 'u
 /** Camera chrome sits in direct daylight, so it needs a stronger scrim than `glass-dark`. */
 const cameraChromeStyle = { background: 'rgba(14, 14, 13, 0.62)' }
 
+const captureFailedMessage = "Couldn't grab that frame — try again."
+
 export function CameraScreen({
   active,
   onCapture,
@@ -86,7 +89,7 @@ export function CameraScreen({
   active: boolean
   onCapture: (blob: Blob) => void
   location: GeoPoint | null
-  locationStatus: 'idle' | 'requesting' | 'ready' | 'off'
+  locationStatus: 'idle' | 'requesting' | 'ready' | 'off' | 'disabled'
   onRequestLocation: () => void
   onClearLocation: () => void
   onOpenProfile: () => void
@@ -95,6 +98,11 @@ export function CameraScreen({
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const capturingRef = useRef(false)
+  const locationChipRef = useRef<HTMLButtonElement>(null)
+  const locationMenuRef = useRef<HTMLDivElement>(null)
+  const locationItemRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const locationMenuId = useId()
   const reduceMotion = useReducedMotion()
   const hapticsEnabled = usePreferences((state) => state.haptics)
   const { user } = useAuth()
@@ -111,6 +119,31 @@ export function CameraScreen({
   const [focusPoint, setFocusPoint] = useState<{ x: number; y: number; id: number } | null>(null)
   const [stillUrl, setStillUrl] = useState<string | null>(null)
   const [locationMenuOpen, setLocationMenuOpen] = useState(false)
+  const [capturing, setCapturing] = useState(false)
+  const [cameraPermission, setCameraPermission] = useState<PermissionState>('prompt')
+  // A short beat between "stream is live" and "window pulls open" so the card
+  // reads as a deliberate frame instead of a one-frame glitch.
+  const [revealed, setRevealed] = useState(false)
+  // The hint is a first-open affordance: switching lenses reuses the pull but
+  // should not repeat the copy.
+  const hasRevealed = useRef(false)
+
+  useEffect(() => {
+    if (!active) {
+      hasRevealed.current = false
+      setRevealed(false)
+      return
+    }
+    if (status !== 'ready') {
+      setRevealed(false)
+      return
+    }
+    const timer = window.setTimeout(() => {
+      hasRevealed.current = true
+      setRevealed(true)
+    }, reduceMotion ? 0 : 260)
+    return () => window.clearTimeout(timer)
+  }, [active, status, reduceMotion])
 
   useEffect(() => {
     if (!active) {
@@ -153,6 +186,9 @@ export function CameraScreen({
         setZoomRange(capabilities.zoom ?? null)
         setZoom(capabilities.zoom ? clamp(1, capabilities.zoom.min, capabilities.zoom.max) : 1)
         setTorchAvailable(Boolean(capabilities.torch))
+        // A freshly acquired track always starts with its torch off, so reset the
+        // button state to match or the UI would claim a light that is not lit.
+        setTorch(false)
         setStatus('ready')
 
         // Keep the last painted frame so leaving and re-entering the camera never
@@ -209,17 +245,33 @@ export function CameraScreen({
   }, [torch, hapticsEnabled])
 
   const handleShutter = useCallback(async () => {
+    if (capturingRef.current) return
     const video = videoRef.current
     if (!video || status !== 'ready') return
-    haptic('medium', hapticsEnabled)
-    setFlash(true)
-    window.setTimeout(() => setFlash(false), 190)
-    const blob = await captureVideoFrame(video)
-    if (blob) onCapture(blob)
+
+    capturingRef.current = true
+    setCapturing(true)
+    try {
+      const blob = await captureVideoFrame(video)
+      if (!blob) {
+        toast.error(captureFailedMessage)
+        return
+      }
+      haptic('medium', hapticsEnabled)
+      setFlash(true)
+      window.setTimeout(() => setFlash(false), 190)
+      onCapture(blob)
+    } catch {
+      toast.error(captureFailedMessage)
+    } finally {
+      capturingRef.current = false
+      setCapturing(false)
+    }
   }, [hapticsEnabled, onCapture, status])
 
   const handlePreviewTap = useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {
+      if (!revealed) return
       const track = currentTrack()
       const video = videoRef.current
       if (!track || !video) return
@@ -230,6 +282,9 @@ export function CameraScreen({
 
       const displayX = clamp((event.clientX - rect.left) / rect.width, 0, 1)
       const displayY = clamp((event.clientY - rect.top) / rect.height, 0, 1)
+      // A selfie preview is mirrored for the user but the sensor is not, so invert
+      // the horizontal coordinate before mapping. The ring still uses displayX.
+      const sensorX = facing === 'user' ? 1 - displayX : displayX
 
       // The track speaks sensor coordinates; the tap happened in the cover-cropped
       // viewfinder, so run it through the same geometry the photo capture uses.
@@ -237,10 +292,10 @@ export function CameraScreen({
       const point =
         crop && video.videoWidth && video.videoHeight
           ? {
-              x: clamp((crop.x + displayX * crop.width) / video.videoWidth, 0, 1),
+              x: clamp((crop.x + sensorX * crop.width) / video.videoWidth, 0, 1),
               y: clamp((crop.y + displayY * crop.height) / video.videoHeight, 0, 1),
             }
-          : { x: displayX, y: displayY }
+          : { x: sensorX, y: displayY }
 
       const support = focusSupport(track)
       if (support === 'unsupported') return
@@ -265,12 +320,84 @@ export function CameraScreen({
         .then(showRing)
         .catch(() => undefined)
     },
-    [hapticsEnabled],
+    [facing, hapticsEnabled, revealed],
   )
 
   useEffect(() => {
     if (locationStatus !== 'ready') setLocationMenuOpen(false)
   }, [locationStatus])
+
+  // getUserMedia can stall (flaky device, a permission sheet dismissed without
+  // resolving). Never leave the user trapped behind the starting overlay.
+  useEffect(() => {
+    if (status !== 'starting') return
+    const timeout = window.setTimeout(() => {
+      setStatus((current) => (current === 'starting' ? 'error' : current))
+    }, 8000)
+    return () => window.clearTimeout(timeout)
+  }, [status])
+
+  // A denied camera is often a site-level block that retrying can never clear,
+  // so ask the Permissions API whether a retry is even worthwhile.
+  useEffect(() => {
+    if (status !== 'denied') return
+    let cancelled = false
+    setCameraPermission('prompt')
+
+    let query: Promise<PermissionStatus> | null = null
+    try {
+      if (typeof navigator.permissions?.query === 'function') {
+        query = navigator.permissions.query({ name: 'camera' as PermissionName })
+      }
+    } catch {
+      query = null
+    }
+    if (!query) return
+
+    query
+      .then((result) => {
+        if (!cancelled) setCameraPermission(result.state)
+      })
+      .catch(() => {
+        if (!cancelled) setCameraPermission('prompt')
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [status])
+
+  useEffect(() => {
+    if (!locationMenuOpen) return
+    locationItemRefs.current[0]?.focus()
+
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      const target = event.target as Node
+      if (locationChipRef.current?.contains(target) || locationMenuRef.current?.contains(target)) {
+        return
+      }
+      setLocationMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', closeOnOutsidePointer)
+    return () => document.removeEventListener('pointerdown', closeOnOutsidePointer)
+  }, [locationMenuOpen])
+
+  const handleLocationMenuKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      setLocationMenuOpen(false)
+      locationChipRef.current?.focus()
+      return
+    }
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+
+    event.preventDefault()
+    const items = locationItemRefs.current.filter((item): item is HTMLButtonElement => Boolean(item))
+    if (!items.length) return
+    const current = items.indexOf(document.activeElement as HTMLButtonElement)
+    const delta = event.key === 'ArrowDown' ? 1 : -1
+    items[(current + delta + items.length) % items.length]?.focus()
+  }
 
   const zoomPresets = zoomRange
     ? [0.5, 1, 2, 3]
@@ -279,11 +406,10 @@ export function CameraScreen({
     : []
 
   const initial = (user?.name?.trim() || user?.email || 'T').slice(0, 1).toUpperCase()
-  const showStill = Boolean(stillUrl) && (status === 'idle' || status === 'starting')
   const locationLabel =
     locationStatus === 'requesting'
       ? 'Locating'
-      : locationStatus === 'off'
+      : locationStatus === 'off' || locationStatus === 'disabled'
         ? 'Location off'
         : locationStatus === 'ready' && location
           ? 'Location on'
@@ -302,28 +428,91 @@ export function CameraScreen({
 
   return (
     <section className="relative h-full w-full overflow-hidden bg-black text-white">
-      <video
-        ref={videoRef}
-        playsInline
-        muted
-        autoPlay
-        className={cn(
-          'absolute inset-0 size-full object-cover transition-opacity duration-500',
-          status === 'ready' ? 'opacity-100' : 'opacity-0',
-        )}
-      />
+      {/*
+        The viewfinder starts as a small, soft-edged window and pulls open to
+        full bleed the moment the stream is ready. Same geometry as the tap
+        mapping below, which assumes a full-screen preview once ready.
+      */}
+      <motion.div
+        initial={false}
+        animate={
+          revealed
+            ? {
+                width: '100%',
+                height: '100%',
+                borderRadius: 0,
+                boxShadow:
+                  '0 0 0 0 rgba(255,255,255,0), 0 24px 50px -20px rgba(0,0,0,0)',
+              }
+            : {
+                width: '54%',
+                height: '62%',
+                borderRadius: 30,
+                boxShadow:
+                  '0 0 0 1px rgba(255,255,255,0.14), 0 24px 50px -20px rgba(0,0,0,0.75)',
+              }
+        }
+        transition={
+          reduceMotion
+            ? { duration: 0.2, ease: 'easeOut' }
+            : { type: 'spring', bounce: 0.06, duration: 0.8 }
+        }
+        className="absolute inset-0 m-auto overflow-hidden bg-black"
+      >
+        <video
+          ref={videoRef}
+          playsInline
+          muted
+          autoPlay
+          className={cn(
+            'absolute inset-0 size-full object-cover',
+            'transition-[opacity,filter] duration-700 ease-out',
+            facing === 'user' && '-scale-x-100',
+            status === 'ready' ? 'opacity-100' : 'opacity-0',
+            revealed ? 'blur-0' : 'blur-[14px]',
+          )}
+        />
 
-      {stillUrl && (
-        <motion.img
-          src={stillUrl}
-          alt=""
+        {stillUrl && (
+          <motion.img
+            src={stillUrl}
+            alt=""
+            aria-hidden
+            initial={false}
+            animate={{
+              opacity: revealed ? 0 : 1,
+              filter: revealed ? 'blur(0px)' : 'blur(4px)',
+            }}
+            transition={reduceMotion ? { duration: 0 } : { duration: 0.45, ease: 'easeOut' }}
+            className="pointer-events-none absolute inset-0 size-full object-cover"
+          />
+        )}
+
+        <AnimatePresence>
+          {!revealed && (
+            <motion.span
+              key="intro-mark"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="pointer-events-none absolute inset-0 grid place-items-center"
+            >
+              <Logo className="size-8 animate-breathe text-white/40" />
+            </motion.span>
+          )}
+        </AnimatePresence>
+
+        {/* One brand pulse at the moment the window locks to full screen. */}
+        <motion.span
           aria-hidden
           initial={false}
-          animate={{ opacity: status === 'ready' ? 0 : 1 }}
-          transition={reduceMotion ? { duration: 0 } : { duration: 0.45, ease: 'easeOut' }}
-          className="pointer-events-none absolute inset-0 size-full object-cover"
+          animate={revealed ? { opacity: [0, 0.9, 0] } : { opacity: 0 }}
+          transition={{ duration: 0.9, times: [0, 0.35, 1], ease: 'easeOut' }}
+          className="pointer-events-none absolute inset-0"
+          style={{ boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--hud) 65%, transparent)' }}
         />
-      )}
+      </motion.div>
 
       <div
         onClick={handlePreviewTap}
@@ -335,40 +524,74 @@ export function CameraScreen({
       <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/65 to-transparent" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-72 bg-gradient-to-t from-black/80 to-transparent" />
 
+      <AnimatePresence>
+        {!revealed && !hasRevealed.current && status !== 'denied' && status !== 'error' && (
+          <motion.div
+            key="intro-hint"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.25 }}
+            className="pointer-events-none absolute inset-0"
+          >
+            <div
+              className="absolute inset-x-0 flex flex-col items-center gap-1"
+              style={{ top: 'calc(50% + 32%)' }}
+            >
+              <p className="label-caps text-white/50">Pulling focus</p>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="pointer-events-auto inline-flex min-h-10 items-center gap-1.5 text-sm text-white/55"
+              >
+                <ImageIcon className="size-3.5" /> Choose from gallery
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {grid && status === 'ready' && (
-        <div className="pointer-events-none absolute inset-0 grid grid-cols-3 grid-rows-3">
+        <div className="pointer-events-none absolute inset-0 grid grid-cols-3 grid-rows-3 drop-shadow-[0_0_1px_rgba(0,0,0,0.7)]">
           {Array.from({ length: 9 }).map((_, index) => (
-            <div key={index} className="border border-white/12" />
+            <div key={index} className="border border-white/30" />
           ))}
         </div>
       )}
 
-      {status === 'ready' && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className="relative size-[68%] max-w-[420px]">
-            {(
-              [
-                'left-0 top-0 border-l border-t rounded-tl-2xl',
-                'right-0 top-0 border-r border-t rounded-tr-2xl',
-                'left-0 bottom-0 border-b border-l rounded-bl-2xl',
-                'right-0 bottom-0 border-b border-r rounded-br-2xl',
-              ] as const
-            ).map((shape) => (
-              <span key={shape} className={cn('absolute size-8 border-white/40', shape)} />
-            ))}
-          </div>
-        </div>
+      {/* The only viewfinder guide: a hairline HUD ring that breathes. */}
+      {revealed && (
+        <motion.div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 m-auto size-[46px] rounded-full"
+          style={{ boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--hud) 55%, transparent)' }}
+          initial={false}
+          animate={
+            reduceMotion
+              ? { opacity: 0.55 }
+              : { opacity: [0.4, 0.75, 0.4], scale: [0.98, 1.03, 0.98] }
+          }
+          transition={
+            reduceMotion ? { duration: 0.3 } : { duration: 4.4, repeat: Infinity, ease: 'easeInOut' }
+          }
+        >
+          <span className="absolute inset-0 m-auto size-[3px] rounded-full bg-white/75" />
+        </motion.div>
       )}
 
       <AnimatePresence>
         {focusPoint && (
           <motion.span
             key={focusPoint.id}
-            initial={{ opacity: 0, scale: 1.5 }}
-            animate={{ opacity: [0, 1, 1, 0], scale: [1.5, 1, 1, 0.95] }}
+            initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 1.5 }}
+            animate={
+              reduceMotion
+                ? { opacity: [0, 1, 1, 0] }
+                : { opacity: [0, 1, 1, 0], scale: [1.5, 1, 1, 0.95] }
+            }
             transition={{ duration: 1.1, times: [0, 0.15, 0.7, 1] }}
             onAnimationComplete={() => setFocusPoint(null)}
-            className="pointer-events-none absolute size-20 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-amber-300/90"
+            className="pointer-events-none absolute size-20 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-hud/90"
             style={{ left: `${(focusPoint?.x ?? 0) * 100}%`, top: `${(focusPoint?.y ?? 0) * 100}%` }}
           />
         )}
@@ -377,16 +600,22 @@ export function CameraScreen({
       <AnimatePresence>
         {flash && (
           <motion.div
-            initial={{ opacity: 0.85 }}
+            initial={{ opacity: reduceMotion ? 0.4 : 0.85 }}
             animate={{ opacity: 0 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.28, ease: 'easeOut' }}
+            transition={reduceMotion ? { duration: 0 } : { duration: 0.28, ease: 'easeOut' }}
             className="pointer-events-none absolute inset-0 bg-white"
           />
         )}
       </AnimatePresence>
 
-      <header className="absolute inset-x-0 top-0 flex items-center justify-between gap-3 px-4 safe-top">
+      <header
+        className={cn(
+          'absolute inset-x-0 top-0 flex items-center justify-between gap-3 px-4 safe-top',
+          'transition-opacity duration-300 delay-100',
+          revealed ? 'opacity-100' : 'pointer-events-none opacity-0',
+        )}
+      >
         <button
           type="button"
           onClick={onOpenProfile}
@@ -405,9 +634,10 @@ export function CameraScreen({
               type="button"
               onClick={toggleTorch}
               aria-label="Torch"
+              aria-pressed={torch}
               className={cn(
                 'grid size-11 place-items-center rounded-full transition-colors active:bg-white/15',
-                torch ? 'text-amber-300' : 'text-white',
+                torch ? 'text-hud' : 'text-white',
               )}
             >
               {torch ? <Zap className="size-5" /> : <ZapOff className="size-5" />}
@@ -420,6 +650,7 @@ export function CameraScreen({
               haptic('light', hapticsEnabled)
             }}
             aria-label="Composition grid"
+            aria-pressed={grid}
             className={cn(
               'grid size-11 place-items-center rounded-full transition-colors active:bg-white/15',
               grid ? 'text-white' : 'text-white/85',
@@ -442,68 +673,86 @@ export function CameraScreen({
         </button>
       </header>
 
-      <footer className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-6 px-6 pb-24 safe-bottom">
-        <button
-          type="button"
-          onClick={handleLocationChip}
-          aria-haspopup={locationStatus === 'ready' ? 'menu' : undefined}
-          aria-expanded={locationStatus === 'ready' ? locationMenuOpen : undefined}
-          className="glass-dark flex min-h-11 items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-medium text-white/95 transition-transform duration-150 ease-out active:scale-[0.98]"
-          style={cameraChromeStyle}
-        >
-          {locationStatus === 'requesting' ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : location ? (
-            <MapPin className="size-4 text-amber-300" />
-          ) : (
-            <MapPinOff
-              className={cn('size-4', locationStatus === 'off' ? 'text-amber-300' : 'text-white/85')}
-            />
-          )}
-          {locationLabel}
-        </button>
+      <footer
+        className={cn(
+          'absolute inset-x-0 bottom-0 flex flex-col items-center gap-6 px-6',
+          'transition-opacity duration-300 delay-100',
+          revealed ? 'opacity-100' : 'pointer-events-none opacity-0',
+        )}
+        style={{ paddingBottom: 'calc(5.5rem + env(safe-area-inset-bottom))' }}
+      >
+        <div className="relative">
+          <button
+            ref={locationChipRef}
+            type="button"
+            onClick={handleLocationChip}
+            aria-haspopup={locationStatus === 'ready' ? 'menu' : undefined}
+            aria-expanded={locationStatus === 'ready' ? locationMenuOpen : undefined}
+            aria-controls={locationStatus === 'ready' ? locationMenuId : undefined}
+            className="glass-dark flex min-h-11 items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-medium text-white/95 transition-transform duration-150 ease-out active:scale-[0.98]"
+            style={cameraChromeStyle}
+          >
+            {locationStatus === 'requesting' ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : location ? (
+              <MapPin className="size-4 text-hud" />
+            ) : (
+              <MapPinOff className="size-4 text-white/85" />
+            )}
+            {locationLabel}
+          </button>
 
-        <AnimatePresence>
-          {locationMenuOpen && (
-            <motion.div
-              role="menu"
-              aria-label="Location options"
-              initial={reduceMotion ? false : { opacity: 0, y: 6, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 6, scale: 0.98 }}
-              transition={reduceMotion ? { duration: 0 } : { duration: 0.16, ease: 'easeOut' }}
-              className="glass-dark flex flex-col overflow-hidden rounded-2xl text-left text-sm"
-              style={cameraChromeStyle}
-            >
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setLocationMenuOpen(false)
-                  haptic('light', hapticsEnabled)
-                  onRequestLocation()
-                }}
-                className="flex min-h-11 items-center gap-2 px-4 text-white/90 transition-colors active:bg-white/10"
+          <AnimatePresence>
+            {locationMenuOpen && (
+              <motion.div
+                ref={locationMenuRef}
+                id={locationMenuId}
+                role="menu"
+                aria-label="Location options"
+                onKeyDown={handleLocationMenuKeyDown}
+                initial={reduceMotion ? false : { opacity: 0, y: 6, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 6, scale: 0.98 }}
+                transition={reduceMotion ? { duration: 0 } : { duration: 0.16, ease: 'easeOut' }}
+                className="glass-dark absolute bottom-full left-0 z-20 mb-2 flex flex-col overflow-hidden rounded-2xl text-left text-sm"
+                style={cameraChromeStyle}
               >
-                <RefreshCw className="size-4" />
-                Refresh location
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setLocationMenuOpen(false)
-                  haptic('light', hapticsEnabled)
-                  onClearLocation()
-                }}
-                className="flex min-h-11 items-center gap-2 border-t border-white/10 px-4 text-white/90 transition-colors active:bg-white/10"
-              >
-                <MapPinOff className="size-4 text-amber-300" />
-                Turn off location
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                <button
+                  ref={(element) => {
+                    locationItemRefs.current[0] = element
+                  }}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setLocationMenuOpen(false)
+                    haptic('light', hapticsEnabled)
+                    onRequestLocation()
+                  }}
+                  className="flex min-h-11 items-center gap-2 px-4 text-white/90 transition-colors active:bg-white/10 focus-visible:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white/70"
+                >
+                  <RefreshCw className="size-4" />
+                  Refresh location
+                </button>
+                <button
+                  ref={(element) => {
+                    locationItemRefs.current[1] = element
+                  }}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setLocationMenuOpen(false)
+                    haptic('light', hapticsEnabled)
+                    onClearLocation()
+                  }}
+                  className="flex min-h-11 items-center gap-2 border-t border-white/10 px-4 text-white/90 transition-colors active:bg-white/10 focus-visible:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white/70"
+                >
+                  <MapPinOff className="size-4 text-hud" />
+                  Turn off location
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
         {zoomPresets.length > 1 && (
           <div
@@ -530,7 +779,9 @@ export function CameraScreen({
                     <motion.span
                       layoutId="zoom-pill"
                       className="absolute inset-0 rounded-full bg-white/15"
-                      transition={{ type: 'spring', bounce: 0.15, duration: 0.4 }}
+                      transition={
+                        reduceMotion ? { duration: 0 } : { type: 'spring', bounce: 0.15, duration: 0.4 }
+                      }
                     />
                   )}
                   <span className="relative z-10">{preset}×</span>
@@ -554,11 +805,15 @@ export function CameraScreen({
           <motion.button
             type="button"
             onClick={handleShutter}
-            whileTap={reduceMotion ? undefined : { scale: 0.92 }}
+            whileTap={reduceMotion || capturing ? undefined : { scale: 0.92 }}
             transition={{ type: 'spring', bounce: 0.2, duration: 0.3 }}
-            disabled={status !== 'ready'}
+            disabled={status !== 'ready' || capturing}
+            aria-busy={capturing}
             aria-label="Take a photo"
-            className="grid size-20 place-items-center rounded-full border-[3px] border-white/90 disabled:opacity-40"
+            className={cn(
+              'grid size-20 place-items-center rounded-full border-[3px] border-white/90',
+              capturing ? 'opacity-60' : 'disabled:opacity-40',
+            )}
           >
             <span className="size-[62px] rounded-full bg-white" />
           </motion.button>
@@ -595,59 +850,59 @@ export function CameraScreen({
       />
 
       <AnimatePresence>
-        {status !== 'ready' && (
+        {(status === 'denied' || status === 'error') && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className={cn(
-              'absolute inset-0 flex flex-col items-center justify-center gap-5 px-8 text-center',
-              showStill ? 'bg-black/45' : 'bg-black',
-            )}
+            className="absolute inset-0 flex flex-col items-center justify-center gap-5 bg-black/85 px-8 text-center backdrop-blur-md"
           >
-            {status === 'starting' || status === 'idle' ? (
-              <>
-                <Logo className="size-16 animate-breathe text-white" />
-                <p className="text-sm text-white/85">Waking up the camera…</p>
-              </>
-            ) : (
-              <>
-                <div className="grid size-14 place-items-center rounded-2xl bg-white/10">
-                  {status === 'denied' ? (
-                    <ShieldAlert className="size-6 text-amber-300" />
-                  ) : (
-                    <CameraIcon className="size-6 text-white/85" />
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <h2 className="display text-2xl text-white">
-                    {status === 'denied' ? 'Camera access is off' : 'The camera did not start'}
-                  </h2>
-                  <p className="mx-auto max-w-xs text-sm leading-relaxed text-white/85">
-                    {status === 'denied'
-                      ? 'Nekibuki needs the camera to look at the place in front of you. You can also pick a photo from your gallery.'
-                      : 'Something interrupted the camera. You can retry, or choose a photo from your gallery instead.'}
-                  </p>
-                </div>
-                <div className="flex flex-col items-center gap-3">
-                  <Button
-                    size="lg"
-                    className="bg-white text-black hover:bg-white/90"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <ImageIcon className="size-4" />
-                    Choose from gallery
-                  </Button>
-                  <button
-                    type="button"
-                    onClick={() => setRestartToken((value) => value + 1)}
-                    className="inline-flex min-h-11 items-center gap-1.5 text-sm text-white/85"
-                  >
-                    <RefreshCw className="size-3.5" /> Retry camera
-                  </button>
-                </div>
-              </>
-            )}
+            <div className="grid size-14 place-items-center rounded-2xl bg-white/10">
+              {status === 'denied' ? (
+                <ShieldAlert className="size-6 text-hud" />
+              ) : (
+                <CameraIcon className="size-6 text-white/85" />
+              )}
+            </div>
+            <div className="space-y-2">
+              <h2 className="display text-2xl text-white">
+                {status === 'denied' ? 'Camera access is off' : 'The camera did not start'}
+              </h2>
+              <p role="status" className="mx-auto max-w-xs text-sm leading-relaxed text-white/85">
+                {status === 'denied'
+                  ? cameraPermission === 'denied'
+                    ? 'Camera is blocked for this site — allow it in your browser’s address-bar settings, then reload.'
+                    : 'Nekibuki needs the camera to look at the place in front of you. You can also pick a photo from your gallery.'
+                  : 'Something interrupted the camera. You can retry, or choose a photo from your gallery instead.'}
+              </p>
+            </div>
+            <div className="flex flex-col items-center gap-3">
+              <Button
+                size="lg"
+                className="bg-white text-black hover:bg-white/90"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <ImageIcon className="size-4" />
+                Choose from gallery
+              </Button>
+              {status === 'denied' && cameraPermission === 'denied' ? (
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="inline-flex min-h-11 items-center gap-1.5 text-sm text-white/85"
+                >
+                  <RefreshCw className="size-3.5" /> Reload
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setRestartToken((value) => value + 1)}
+                  className="inline-flex min-h-11 items-center gap-1.5 text-sm text-white/85"
+                >
+                  <RefreshCw className="size-3.5" /> Retry camera
+                </button>
+              )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

@@ -125,7 +125,7 @@ check('no API errors in console', apiErrors.length === 0, apiErrors.join(' | '))
 // -------------------------------------------------------------------- history
 await page.goto(BASE, { waitUntil: 'networkidle' })
 await page.waitForTimeout(1500)
-await page.getByRole('tab', { name: 'Places' }).click()
+await page.getByRole('button', { name: 'Places', exact: true }).click()
 await page.waitForTimeout(1500)
 await shot('smoke-06-history')
 const rows = await page.locator('ul li button').count()

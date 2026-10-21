@@ -5,9 +5,15 @@
 
 /*
  * Design language:
- *   warm paper background, near-black ink, a single clay accent,
+ *   warm paper background, near-black ink, a single brand hue,
  *   Newsreader for anything editorial, system sans for chrome,
  *   14px base radius with a multiplicative scale.
+ *
+ * The brand hue has three jobs, so it gets three tokens:
+ *   --brand      fills and marks on paper (logo, avatar, markers)
+ *   --brand-ink  brand-coloured text on paper (links, badges)
+ *   --brand-fg   the ink that sits on top of a --brand fill
+ *   --hud        marks drawn over a photograph (viewfinder, scan line)
  */
 :root {
   --background: #faf9f5;
@@ -21,15 +27,23 @@
   --secondary: #f0eee6;
   --secondary-foreground: #141413;
   --muted: #f0eee6;
-  --muted-foreground: #73726c;
+  --muted-foreground: #6b6a63;
   --accent: #e8e6dc;
   --accent-foreground: #141413;
-  --clay: #d97757;
+  --brand: #0f5f57;
+  --brand-ink: #0f5f57;
+  --brand-fg: #f2fbf8;
+  --hud: #6cc0b0;
+  --hud-fg: #141413;
+  /* Compatibility aliases: older components still speak in "clay". */
+  --clay: var(--brand);
+  --clay-ink: var(--brand-ink);
+  --clay-foreground: var(--brand-fg);
   --destructive: #c4472f;
   --destructive-foreground: #faf9f5;
   --border: #e8e6dc;
   --input: #e0ded3;
-  --ring: #d97757;
+  --ring: var(--brand-ink);
   --radius: 0.875rem;
   --glass-border: rgba(255, 255, 255, 0.55);
   --shadow-ambient: 0 1px 2px rgba(20, 20, 19, 0.04), 0 12px 32px -22px rgba(20, 20, 19, 0.28);
@@ -50,14 +64,78 @@
   --muted-foreground: #a3a199;
   --accent: #3a3936;
   --accent-foreground: #faf9f5;
-  --clay: #d97757;
-  --destructive: #c4472f;
+  --brand-ink: #7fc7bb;
+  --brand-fg: #f2fbf8;
+  --hud: #6cc0b0;
+  --hud-fg: #141413;
+  --destructive: #e07a60;
   --destructive-foreground: #faf9f5;
   --border: rgba(250, 249, 245, 0.09);
   --input: rgba(250, 249, 245, 0.14);
-  --ring: #d97757;
   --glass-border: rgba(255, 255, 255, 0.08);
   --shadow-ambient: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 40px -24px rgba(0, 0, 0, 0.7);
+}
+
+/*
+ * Brand presets for the token lab.
+ * Switch with ?brand=<name> (persisted) or by setting data-brand on <html>.
+ * Each preset keeps the paper, the serif and the radii; only the hue moves.
+ * Petrol is the default, so it needs no attribute.
+ */
+[data-brand='clay'] {
+  --brand: #d97757;
+  --brand-ink: #a8452a;
+  --brand-fg: #3b1c10;
+  --hud: #eaa084;
+}
+
+[data-brand='clay'].dark {
+  --brand-ink: #d97757;
+  --brand-fg: #3b1c10;
+}
+
+[data-brand='okra'] {
+  --brand: #9c6116;
+  --brand-ink: #8f5d14;
+  --brand-fg: #ffffff;
+  --hud: #daa15a;
+}
+
+[data-brand='okra'].dark {
+  --brand-ink: #d9a45a;
+}
+
+[data-brand='petrol'] {
+  --brand: #0f5f57;
+  --brand-ink: #0f5f57;
+  --brand-fg: #f2fbf8;
+  --hud: #6cc0b0;
+}
+
+[data-brand='petrol'].dark {
+  --brand-ink: #7fc7bb;
+}
+
+[data-brand='lapis'] {
+  --brand: #2a4c8f;
+  --brand-ink: #2a4c8f;
+  --brand-fg: #f4f6fc;
+  --hud: #90aee0;
+}
+
+[data-brand='lapis'].dark {
+  --brand-ink: #a8bde6;
+}
+
+[data-brand='saffron'] {
+  --brand: #c98a1c;
+  --brand-ink: #8a5a00;
+  --brand-fg: #2b1a00;
+  --hud: #ecc063;
+}
+
+[data-brand='saffron'].dark {
+  --brand-ink: #e8c48f;
 }
 
 @theme inline {
@@ -75,7 +153,14 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-fg: var(--brand-fg);
+  --color-hud: var(--hud);
+  --color-hud-fg: var(--hud-fg);
   --color-clay: var(--clay);
+  --color-clay-ink: var(--clay-ink);
+  --color-clay-foreground: var(--clay-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
@@ -136,7 +221,7 @@
   }
 
   ::selection {
-    background: color-mix(in srgb, var(--clay) 26%, transparent);
+    background: color-mix(in srgb, var(--brand) 26%, transparent);
   }
 
   :focus-visible {

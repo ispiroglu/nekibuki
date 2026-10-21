@@ -36,6 +36,8 @@ export function Shell() {
   const requestLocation = useLocationStore((state) => state.request)
   const repository = useRepository()
 
+  // Only `idle` (a fresh store / first mount) auto-requests. After a deliberate
+  // opt-out the store is `disabled`, and this effect must leave it alone.
   useEffect(() => {
     if (locationStatus === 'idle') void requestLocation()
   }, [locationStatus, requestLocation])

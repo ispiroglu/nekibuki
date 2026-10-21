@@ -76,7 +76,7 @@ export async function analyzePhoto(options: {
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') throw error
     if (error instanceof ApiError) throw error
-    if (MOCK_FALLBACK) {
+    if (MOCK_FALLBACK && !import.meta.env.PROD) {
       const report = await clientMockAnalysis(image, language)
       return { report, meta: { provider: 'mock', model: 'local-demo' } }
     }
@@ -116,7 +116,7 @@ export async function askGuide(options: {
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') throw error
     if (error instanceof ApiError) throw error
-    if (MOCK_FALLBACK) {
+    if (MOCK_FALLBACK && !import.meta.env.PROD) {
       await sleep(750)
       return mockChatAnswer(report, question)
     }

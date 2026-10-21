@@ -96,6 +96,7 @@ export function ProfileScreen() {
         <Row icon={<Globe />} title="Language" description="Language of the guide">
           <Segmented
             className="shrink-0"
+            label="Guide language"
             value={guideLanguage}
             onChange={(value) => {
               setGuideLanguage(value)
@@ -128,6 +129,7 @@ export function ProfileScreen() {
       <Group title="Appearance & feel">
         <Row icon={<MonitorCog />} title="Appearance" description="Match your device or pick one" stacked>
           <Segmented
+            label="Appearance"
             value={appearance}
             onChange={(value: Appearance) => setAppearance(value)}
             options={[
@@ -288,7 +290,7 @@ function Row({
   }
 
   return (
-    <div className="flex min-h-12 w-full items-center gap-3 px-4 text-left active:bg-accent/60">
+    <div className="flex min-h-12 w-full items-center gap-3 px-4 text-left">
       {identity}
       {children}
     </div>
