@@ -15,6 +15,12 @@ const HistoryScreen = lazy(() =>
   import('@/screens/history-screen').then((module) => ({ default: module.HistoryScreen })),
 )
 
+const SCREEN_COUNT = 3
+
+/** Focus targets that own the arrow keys themselves. */
+const ARROW_KEY_OWNERS =
+  'input, textarea, select, [contenteditable="true"], [role="textbox"], [role="slider"], [role="radiogroup"], [role="tablist"], [role="menu"], [role="dialog"]'
+
 function PageSkeleton() {
   return (
     <div className="h-full space-y-4 overflow-hidden bg-background px-5 safe-top">
@@ -63,6 +69,29 @@ export function Shell() {
     },
     [setCapture],
   )
+
+  // Pointer users can swipe or tap the page dots; keyboard users get the same
+  // panel switch with the arrow keys, unless they are typing or driving a
+  // control that already owns those keys. The deck handles the case where its
+  // own container has focus and marks the event as handled.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+      if (!(event.target instanceof Element)) return
+      if (event.target.closest(ARROW_KEY_OWNERS)) return
+
+      const current = useAppStore.getState().screenIndex
+      const next = event.key === 'ArrowRight' ? current + 1 : current - 1
+      if (next < 0 || next >= SCREEN_COUNT) return
+
+      event.preventDefault()
+      setScreenIndex(next)
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [setScreenIndex])
 
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-background">
