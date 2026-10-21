@@ -954,7 +954,20 @@ export function CameraScreen({
             Viewfinder settings
           </button>
 
-          <div className="absolute inset-x-0 top-2 flex justify-center px-2">
+          {/*
+            The first-run copy has to share the top of the frame with the
+            global swipe pill (safe-area top + 4.75rem, ~2.2rem tall). This
+            column starts below the header, so 4.75rem here lands the hint
+            just under that pill instead of covering it, and pointer-events
+            stay off so the long-press target under it is never blocked. The
+            settings shelf keeps its own top offset.
+          */}
+          <div
+            className={cn(
+              'pointer-events-none absolute inset-x-0 flex justify-center px-2',
+              settingsOpen ? 'top-2' : 'top-[4.75rem]',
+            )}
+          >
             {settingsOpen ? (
               <ViewfinderSettings
                 panelRef={settingsPanelRef}
@@ -984,7 +997,7 @@ export function CameraScreen({
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: reduceMotion ? 0 : 0.3 }}
-                    className="inline-flex items-center gap-1.5 text-xs font-medium text-white/80 [text-shadow:0_1px_3px_rgb(0_0_0_/_0.9)] group-focus-within:opacity-0"
+                    className="pointer-events-none inline-flex items-center gap-1.5 text-xs font-medium text-white/80 [text-shadow:0_1px_3px_rgb(0_0_0_/_0.9)] group-focus-within:opacity-0"
                   >
                     <SlidersHorizontal className="size-3.5" />
                     Hold for settings
