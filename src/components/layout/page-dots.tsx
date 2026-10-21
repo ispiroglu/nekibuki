@@ -1,11 +1,11 @@
 import { motion } from 'motion/react'
-import { Camera, History, UserRound } from 'lucide-react'
+import { Bookmark, Camera, UserRound } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const SCREENS = [
   { index: 0, label: 'You', icon: UserRound },
   { index: 1, label: 'Camera', icon: Camera },
-  { index: 2, label: 'Places', icon: History },
+  { index: 2, label: 'Places', icon: Bookmark },
 ]
 
 export function PageDots({

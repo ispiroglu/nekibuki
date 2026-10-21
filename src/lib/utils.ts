@@ -9,20 +9,40 @@ export function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+const MONTH_NAMES = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+]
+
+/**
+ * One axis of distance, so a column of dates reads as one column:
+ * `Today, 17:16` → `Yesterday` → `4 days ago` → `13 Oct`.
+ */
 export function formatRelativeDate(timestamp: number): string {
   const date = new Date(timestamp)
   const now = new Date()
-  const diff = now.getTime() - date.getTime()
-  const day = 24 * 60 * 60 * 1000
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+  const days = Math.round((startOfToday - startOfDate) / (24 * 60 * 60 * 1000))
 
-  if (diff < 60 * 1000) return 'Just now'
-  if (diff < 60 * 60 * 1000) return `${Math.floor(diff / (60 * 1000))} min ago`
-  if (diff < day && date.getDate() === now.getDate()) {
-    return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+  if (days <= 0) {
+    const hours = String(date.getHours()).padStart(2, '0')
+    const minutes = String(date.getMinutes()).padStart(2, '0')
+    return `Today, ${hours}:${minutes}`
   }
-  if (diff < 2 * day) return 'Yesterday'
-  if (diff < 7 * day) return `${Math.floor(diff / day)} days ago`
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+  if (days === 1) return 'Yesterday'
+  if (days <= 7) return `${days} days ago`
+  return `${date.getDate()} ${MONTH_NAMES[date.getMonth()]}`
 }
 
 export function groupDay(timestamp: number): 'today' | 'yesterday' | 'week' | 'earlier' {

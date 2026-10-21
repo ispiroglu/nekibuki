@@ -32,7 +32,7 @@ import { initials } from '@/lib/utils'
 import { useAppStore } from '@/store/app'
 import { usePreferences, type Appearance } from '@/store/preferences'
 
-export function ProfileScreen() {
+export function ProfileScreen({ active }: { active?: boolean }) {
   const { user, signOut, mode } = useAuth()
   const { analyses, repository } = useHistory()
   const { canInstall, installed, promptInstall } = useInstallPrompt()
@@ -44,6 +44,11 @@ export function ProfileScreen() {
   const setHaptics = usePreferences((state) => state.setHaptics)
   const bumpHistory = useAppStore((state) => state.bumpHistory)
   const setScreenIndex = useAppStore((state) => state.setScreenIndex)
+  // The deck keeps every panel mounted, so the panel that owns the route must
+  // be the only `h1` on it. The shell may pass `active`; the store is the
+  // fallback so the page never carries two headings of the same level.
+  const panelActive = useAppStore((state) => state.screenIndex === 0)
+  const isActive = active ?? panelActive
   const [confirmClear, setConfirmClear] = useState(false)
 
   const stats = useMemo(() => {
@@ -52,31 +57,37 @@ export function ProfileScreen() {
     return { places: analyses.length, cities: cities.size, messages }
   }, [analyses])
 
-  return (
-    <section className="h-full overflow-y-auto overscroll-contain bg-background pb-28">
-      <div className="mx-auto w-full max-w-2xl px-5 safe-top">
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => setScreenIndex(1)}
-            aria-label="Open the camera"
-            className="grid size-11 place-items-center rounded-full bg-secondary text-foreground active:scale-[0.97]"
-          >
-            <Camera className="size-5" />
-          </button>
-        </div>
+  const Heading = isActive ? 'h1' : 'h2'
 
-        <div className="mt-4 flex items-center gap-4">
-          <Avatar className="size-16">
-            {user?.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.name} />}
-            <AvatarFallback className="text-2xl">{initials(user?.name ?? 'N')}</AvatarFallback>
-          </Avatar>
-          <div className="min-w-0 flex-1">
-            <h1 className="display truncate text-3xl font-medium">{user?.name}</h1>
-            <p className="truncate text-sm text-muted-foreground">{user?.email}</p>
-            <span className="mt-2 inline-flex items-center rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground">
-              {mode === 'supabase' ? 'Google account' : 'Demo account'}
-            </span>
+  return (
+    <section className="h-full touch-pan-y overflow-y-auto overscroll-contain bg-background pb-28">
+      <div className="mx-auto w-full max-w-2xl px-5 safe-top">
+        <div className="flex flex-col [@media(max-height:480px)]:flex-row [@media(max-height:480px)]:items-center [@media(max-height:480px)]:gap-3">
+          <div className="flex justify-end [@media(max-height:480px)]:contents">
+            <button
+              type="button"
+              onClick={() => setScreenIndex(1)}
+              aria-label="Open the camera"
+              className="grid size-11 shrink-0 place-items-center self-end rounded-full bg-secondary text-foreground active:scale-[0.97] [@media(max-height:480px)]:self-auto"
+            >
+              <Camera className="size-5" />
+            </button>
+          </div>
+
+          <div className="mt-4 flex items-center gap-4 [@media(max-height:480px)]:mt-0 [@media(max-height:480px)]:min-w-0 [@media(max-height:480px)]:flex-1">
+            <Avatar className="size-16 [@media(max-height:480px)]:size-12">
+              {user?.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.name} />}
+              <AvatarFallback className="text-2xl">{initials(user?.name ?? 'N')}</AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1">
+              <Heading className="display truncate text-3xl font-medium [@media(max-height:480px)]:text-2xl">
+                {user?.name}
+              </Heading>
+              <p className="truncate text-sm text-muted-foreground">{user?.email}</p>
+              <span className="mt-2 inline-flex items-center rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground">
+                {mode === 'supabase' ? 'Google account' : 'Demo account'}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -94,7 +105,7 @@ export function ProfileScreen() {
         </dl>
 
         <Group title="The guide">
-          <Row icon={<Globe />} title="Language" description="Language of the guide">
+          <Row icon={<Globe />} title="Language" description="Guide language">
             <Segmented
               className="shrink-0"
               label="Guide language"
@@ -109,11 +120,11 @@ export function ProfileScreen() {
               ]}
             />
           </Row>
-          <Row icon={<Sparkles />} title="Welcome slides" description="Show the intro again">
+          <Row icon={<Sparkles />} title="Intro slides" description="Show it again">
             <Button
               variant="secondary"
               size="sm"
-              className="shrink-0"
+              className="h-11 shrink-0"
               onClick={() => {
                 const userId = user?.id ?? ''
                 usePreferences.setState((state) => ({
@@ -145,8 +156,14 @@ export function ProfileScreen() {
               ]}
             />
           </Row>
-          <Row icon={<Vibrate />} title="Haptics" description="A gentle tap on capture">
+          <Row
+            icon={<Vibrate />}
+            title="Haptics"
+            titleId="profile-haptics-label"
+            description="A gentle tap on capture"
+          >
             <Switch
+              aria-labelledby="profile-haptics-label"
               checked={hapticsEnabled}
               onCheckedChange={(value) => {
                 setHaptics(value)
@@ -179,7 +196,7 @@ export function ProfileScreen() {
                   ? 'Already installed'
                   : canInstall
                     ? 'Add it to your home screen'
-                    : 'Available from your browser menu'}
+                    : 'From your browser menu'}
               </span>
             </span>
             <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
@@ -199,7 +216,7 @@ export function ProfileScreen() {
               Clear my places
             </span>
             <span className="block truncate text-xs text-muted-foreground">
-              Removes every saved guide and conversation
+              Removes every saved guide
             </span>
           </span>
           <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
@@ -208,7 +225,7 @@ export function ProfileScreen() {
         <button
           type="button"
           onClick={() => void signOut()}
-          className="mt-8 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-card font-medium text-destructive shadow-[0_0_0_1px_var(--border)] active:scale-[0.99]"
+          className="mt-8 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-card font-medium text-foreground shadow-[0_0_0_1px_var(--border)] active:scale-[0.99]"
         >
           <LogOut className="size-4" /> Sign out
         </button>
@@ -267,6 +284,7 @@ function Row({
   description,
   children,
   stacked,
+  titleId,
 }: {
   icon: React.ReactNode
   title: string
@@ -274,6 +292,8 @@ function Row({
   children: React.ReactNode
   /** Put the control on its own line — for wide controls like a segmented picker. */
   stacked?: boolean
+  /** Id of the visible title, so a control can take it as its accessible name. */
+  titleId?: string
 }) {
   const identity = (
     <>
@@ -281,7 +301,9 @@ function Row({
         {icon}
       </span>
       <div className="min-w-0 flex-1 py-3">
-        <p className="truncate text-[15px] font-medium">{title}</p>
+        <p id={titleId} className="truncate text-[15px] font-medium">
+          {title}
+        </p>
         <p className="truncate text-xs text-muted-foreground">{description}</p>
       </div>
     </>

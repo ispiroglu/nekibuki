@@ -36,7 +36,7 @@ export function Segmented<T extends string>({
     <div
       role="radiogroup"
       aria-label={label}
-      className={cn('inline-flex items-center gap-1 rounded-full bg-secondary p-1', className)}
+      className={cn('inline-flex items-center gap-1 rounded-full bg-secondary p-0', className)}
     >
       {options.map((option, index) => {
         const active = option.value === value
@@ -61,14 +61,14 @@ export function Segmented<T extends string>({
               }
             }}
             className={cn(
-              'relative inline-flex h-9 items-center justify-center gap-1.5 rounded-full px-4 text-[13px] font-medium transition-colors duration-200',
+              'relative inline-flex h-11 items-center justify-center gap-1.5 rounded-full px-4 text-[13px] font-medium transition-colors duration-200',
               active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
             )}
           >
             {active && (
               <motion.span
                 layoutId={layoutId}
-                className="absolute inset-x-0 inset-y-0.5 rounded-full bg-card shadow-[0_0_0_1px_var(--border)]"
+                className="absolute inset-x-0 inset-y-1 rounded-full bg-card shadow-[0_0_0_1px_var(--border)]"
                 transition={{ type: 'spring', bounce: 0.12, duration: 0.42 }}
               />
             )}
