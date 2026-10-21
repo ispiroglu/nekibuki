@@ -1,9 +1,13 @@
 import { motion, useReducedMotion } from 'motion/react'
 import { Loader2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Logo } from '@/components/brand/logo'
 import { useAuth } from '@/lib/auth'
 import { spring } from '@/lib/motion'
+
+const LINK =
+  'rounded-sm text-brand-ink underline decoration-brand-ink/40 underline-offset-4 transition-colors hover:decoration-brand-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ink'
 
 export interface OAuthFailure {
   title: string
@@ -102,7 +106,7 @@ export function LoginScreen() {
   const busy = pending || loading
 
   return (
-    <div className="flex min-h-dvh flex-col bg-background px-5 safe-top safe-bottom sm:px-6 [@media(orientation:landscape)_and_(max-height:560px)]:grid [@media(orientation:landscape)_and_(max-height:560px)]:grid-cols-[1.05fr_0.95fr] [@media(orientation:landscape)_and_(max-height:560px)]:items-center [@media(orientation:landscape)_and_(max-height:560px)]:gap-10">
+    <main className="flex min-h-dvh flex-col bg-background px-5 safe-top safe-bottom sm:px-6 [@media(orientation:landscape)_and_(max-height:560px)]:grid [@media(orientation:landscape)_and_(max-height:560px)]:grid-cols-[1.05fr_0.95fr] [@media(orientation:landscape)_and_(max-height:560px)]:items-center [@media(orientation:landscape)_and_(max-height:560px)]:gap-10">
       <motion.div
         initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -161,10 +165,18 @@ export function LoginScreen() {
         </button>
 
         <p className="mt-4 text-center text-xs text-muted-foreground">
-          By continuing you agree to our Terms and Privacy Policy.
+          By continuing you agree to our{' '}
+          <Link to="/terms" className={LINK}>
+            Terms
+          </Link>{' '}
+          and{' '}
+          <Link to="/privacy" className={LINK}>
+            Privacy Policy
+          </Link>
+          .
           {mode === 'mock' && ' Demo mode — no Google account is contacted.'}
         </p>
       </motion.div>
-    </div>
+    </main>
   )
 }
