@@ -98,7 +98,7 @@ await page.getByRole('button', { name: /Ask about/ }).first().click()
 await page.waitForTimeout(1500)
 await shot('smoke-04-chat')
 
-const input = page.getByPlaceholder(/Ask a question/i)
+const input = page.getByPlaceholder(/Ask about/i)
 check('chat input is available', await input.isVisible())
 await input.fill('What should I look at first?')
 await page.getByLabel('Send').click()
