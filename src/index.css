@@ -14,6 +14,11 @@
  *   --brand-ink  brand-coloured text on paper (links, badges)
  *   --brand-fg   the ink that sits on top of a --brand fill
  *   --hud        marks drawn over a photograph (viewfinder, scan line)
+ *
+ * Two rules hold the hue together:
+ *   A fill always clears 3:1 against the page it sits on, in both themes.
+ *   The fill decides the ink: a deep fill takes a pale ink, a lifted fill
+ *   takes the dark ink. --brand-fg follows --brand, never the other way round.
  */
 :root {
   --background: #faf9f5;
@@ -33,6 +38,12 @@
   --brand: #0f5f57;
   --brand-ink: #0f5f57;
   --brand-fg: #f2fbf8;
+  /*
+   * HUD: a mark drawn over a photograph.
+   * A HUD fill always takes `--hud-fg` ink on top of it — never white and
+   * never `--photo-ink`. White on `--hud` measures 2.14:1; `--hud-fg` on
+   * `--hud` measures 8.61:1. The pair is the contract.
+   */
   --hud: #6cc0b0;
   --hud-fg: #141413;
   --destructive: #c4472f;
@@ -60,8 +71,14 @@
   --muted-foreground: #a3a199;
   --accent: #3a3936;
   --accent-foreground: #faf9f5;
+  /*
+   * Night reading mode lifts the brand fill to a step that still reads as an
+   * edge on dark paper (4.26:1, where the light fill would be 2.22:1). A lifted
+   * fill is a light surface, so the ink on top of it flips to the dark ink.
+   */
+  --brand: #2f8f83;
   --brand-ink: #7fc7bb;
-  --brand-fg: #f2fbf8;
+  --brand-fg: #141413;
   --hud: #6cc0b0;
   --hud-fg: #141413;
   --destructive: #e07a60;
@@ -78,18 +95,20 @@
  * Each preset keeps the paper, the serif and the radii; only the hue moves.
  * Petrol is the default (the documented identity); clay is the opt-in
  * terracotta experiment. Every preset still needs all four roles, so a
- * component never has to know which hue is active.
+ * component never has to know which hue is active — and every preset states
+ * its own dark fill, so none of them silently inherits the light-mode one.
  */
 [data-brand='clay'] {
-  --brand: #d97757;
+  --brand: #c25f3f;
   --brand-ink: #a8452a;
-  --brand-fg: #3b1c10;
+  --brand-fg: #180a05;
   --hud: #eaa084;
 }
 
 [data-brand='clay'].dark {
+  --brand: #e08a63;
   --brand-ink: #d97757;
-  --brand-fg: #3b1c10;
+  --brand-fg: #331708;
 }
 
 [data-brand='okra'] {
@@ -100,7 +119,9 @@
 }
 
 [data-brand='okra'].dark {
+  --brand: #cf9a3c;
   --brand-ink: #d9a45a;
+  --brand-fg: #2b1a00;
 }
 
 [data-brand='petrol'] {
@@ -111,7 +132,9 @@
 }
 
 [data-brand='petrol'].dark {
+  --brand: #2f8f83;
   --brand-ink: #7fc7bb;
+  --brand-fg: #141413;
 }
 
 [data-brand='lapis'] {
@@ -122,7 +145,9 @@
 }
 
 [data-brand='lapis'].dark {
+  --brand: #6b8fd4;
   --brand-ink: #a8bde6;
+  --brand-fg: #0f1a33;
 }
 
 [data-brand='saffron'] {
@@ -133,7 +158,9 @@
 }
 
 [data-brand='saffron'].dark {
+  --brand: #dfae4a;
   --brand-ink: #e8c48f;
+  --brand-fg: #2b1a00;
 }
 
 @theme inline {
@@ -172,6 +199,23 @@
   --font-sans:
     system-ui, -apple-system, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --font-serif: 'Newsreader Variable', ui-serif, Georgia, serif;
+
+  /*
+   * The type ramp, in order. Every size the system names is one of these
+   * steps, so a screen never has to invent a size: title 30, headline 24,
+   * lede 22, value 18, reading 17, body 16, list 15, ui 13, label 12,
+   * meta 11.2. Display (36–48) stays a range and is set with a clamp.
+   */
+  --text-title: 30px;
+  --text-headline: 24px;
+  --text-lede: 22px;
+  --text-value: 18px;
+  --text-reading: 17px;
+  --text-body: 16px;
+  --text-list: 15px;
+  --text-ui: 13px;
+  --text-label: 12px;
+  --text-meta: 11.2px;
 
   --shadow-ambient: var(--shadow-ambient);
 }
@@ -265,9 +309,14 @@
   backdrop-filter: blur(24px) saturate(1.8);
 }
 
-/* Glass over the viewfinder. */
+/*
+ * Glass over the viewfinder.
+ * The scrim is dark enough for white text to survive any photograph: over a
+ * blown-out sky it still measures 5.4:1, over a mid-bright wall 6.8:1. The
+ * paper glass above is a separate token and is untouched by this one.
+ */
 @utility glass-dark {
-  background: rgba(20, 20, 19, 0.42);
+  background: rgba(14, 14, 13, 0.62);
   border: 1px solid rgba(255, 255, 255, 0.12);
   -webkit-backdrop-filter: blur(20px) saturate(1.8);
   backdrop-filter: blur(20px) saturate(1.8);
@@ -400,10 +449,31 @@
   animation: nekibuki-shimmer 1.6s linear infinite;
 }
 
+/*
+ * Reduced motion, globally.
+ *
+ * The decorative keyframes stop dead — the scan line, the breathing ring and
+ * the shimmer are motion with no information in them. The catch-all below
+ * covers any animation added later: it plays once and lands on its end state.
+ * `animation-duration` is used rather than `animation: none` so that an
+ * animation which does carry information still ends in the state it means.
+ *
+ * Transitions are deliberately left alone. A state change whose only tell is
+ * opacity must stay perceivable, so nothing here shortens a transition.
+ */
 @media (prefers-reduced-motion: reduce) {
   .animate-scan,
   .animate-breathe,
   .shimmer {
     animation: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
   }
 }

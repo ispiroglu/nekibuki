@@ -17,7 +17,7 @@ function ViewfinderArt() {
   const reduceMotion = useReducedMotion()
 
   return (
-    <div className="relative grid size-[clamp(8rem,24vh,13rem)] place-items-center">
+    <div className="relative grid size-[13rem] place-items-center">
       <svg viewBox="0 0 120 120" fill="none" aria-hidden className="absolute inset-0 size-full">
         <g stroke="var(--brand)" strokeWidth="4" strokeLinecap="round">
           <path d="M10 40A30 30 0 0 1 40 10" />
@@ -31,9 +31,9 @@ function ViewfinderArt() {
         transition={
           reduceMotion ? { duration: 0 } : { duration: 4.5, repeat: Infinity, ease: 'easeInOut' }
         }
-        className="text-foreground/15"
+        className="text-foreground"
       >
-        <Logo className="size-[clamp(2.75rem,8vh,4rem)]" />
+        <Logo className="size-[5.5rem]" />
       </motion.span>
     </div>
   )
@@ -70,7 +70,7 @@ function DiscoveryArt() {
             className="min-w-0 rounded-xl bg-secondary px-2.5 py-1.5 [@media(min-height:700px)]:py-2"
           >
             <dt className="label-caps text-muted-foreground">{fact.label}</dt>
-            <dd className="display mt-0.5 text-base leading-snug break-words">{fact.value}</dd>
+            <dd className="display mt-0.5 text-value leading-[1.3] break-words">{fact.value}</dd>
           </motion.div>
         ))}
       </dl>
@@ -82,12 +82,12 @@ function DiscoveryArt() {
 function ConversationArt() {
   const reduceMotion = useReducedMotion()
   return (
-    <div className="w-60 max-w-full space-y-2 sm:w-64 [@media(min-height:700px)]:space-y-3">
+    <div className="w-52 space-y-2 [@media(min-height:700px)]:space-y-3">
       <motion.p
         initial={reduceMotion ? false : { opacity: 0, x: 12 }}
         animate={{ opacity: 1, x: 0 }}
         transition={reduceMotion ? { duration: 0 } : spring}
-        className="ml-auto w-fit rounded-3xl rounded-br-lg bg-primary px-4 py-2 text-sm text-primary-foreground [@media(min-height:700px)]:py-2.5"
+        className="ml-auto w-fit rounded-3xl rounded-br-lg bg-primary px-4 py-2 text-ui text-primary-foreground [@media(min-height:700px)]:py-2.5"
       >
         Who built this?
       </motion.p>
@@ -95,7 +95,7 @@ function ConversationArt() {
         initial={reduceMotion ? false : { opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={reduceMotion ? { duration: 0 } : { ...spring, delay: 0.16 }}
-        className="font-serif text-base leading-relaxed [@media(min-height:700px)]:text-[1.05rem]"
+        className="font-serif text-reading leading-[1.7]"
       >
         Genoese merchants, in 1348 — as the crown of their walled colony.
       </motion.p>
@@ -103,7 +103,7 @@ function ConversationArt() {
         initial={reduceMotion ? false : { opacity: 0, x: 12 }}
         animate={{ opacity: 1, x: 0 }}
         transition={reduceMotion ? { duration: 0 } : { ...spring, delay: 0.3 }}
-        className="ml-auto w-fit rounded-3xl rounded-br-lg bg-primary px-4 py-2 text-sm text-primary-foreground [@media(min-height:700px)]:py-2.5"
+        className="ml-auto w-fit rounded-3xl rounded-br-lg bg-primary px-4 py-2 text-ui text-primary-foreground [@media(min-height:700px)]:py-2.5"
       >
         Can I go up at night?
       </motion.p>
@@ -152,7 +152,7 @@ export function OnboardingScreen() {
   return (
     <div className="flex min-h-dvh flex-col overflow-x-hidden bg-background">
       <header className="flex shrink-0 items-center justify-between gap-3 px-5 py-1 safe-top sm:px-6">
-        <p className="display flex min-w-0 items-baseline text-lg text-brand-ink">
+        <p className="display flex min-w-0 items-baseline text-value text-brand-ink">
           <span className="shrink-0">Welcome,&nbsp;</span>
           <span className="min-w-0 truncate" title={fullName}>
             {firstName}.
@@ -161,7 +161,7 @@ export function OnboardingScreen() {
         <button
           type="button"
           onClick={finish}
-          className="-mr-2 inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center px-2 py-2 text-sm text-muted-foreground transition-colors active:text-foreground motion-reduce:transition-none"
+          className="-mr-2 inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center px-2 py-2 text-ui text-muted-foreground transition-colors active:text-foreground motion-reduce:transition-none"
         >
           Skip
         </button>
@@ -198,7 +198,7 @@ export function OnboardingScreen() {
               <h1 className="display text-[clamp(2.25rem,8vw,2.6rem)] font-medium">
                 {slide.title}
               </h1>
-              <p className="mt-3 max-w-[34rem] text-base leading-6 text-muted-foreground [@media(min-height:700px)]:text-lg [@media(min-height:700px)]:leading-relaxed">
+              <p className="mt-3 max-w-[34rem] text-body leading-6 text-muted-foreground">
                 {slide.body}
               </p>
             </div>
