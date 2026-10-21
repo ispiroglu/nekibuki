@@ -49,11 +49,13 @@ function DeckPage({
   x,
   width,
   index,
+  active,
   children,
 }: {
   x: MotionValue<number>
   width: number
   index: number
+  active: boolean
   children: ReactNode
 }) {
   const offset = useTransform(x, (value) => value + index * width)
@@ -62,7 +64,14 @@ function DeckPage({
   const opacity = useTransform(progress, [0, 1], [1, 0.5])
 
   return (
-    <motion.div style={{ scale, opacity, width }} className="h-full shrink-0">
+    // Off-screen panels stay mounted (the deck animates them) but must not
+    // accept focus or be announced while the user cannot see them.
+    <motion.div
+      style={{ scale, opacity, width }}
+      className="h-full shrink-0"
+      inert={!active}
+      aria-hidden={active ? undefined : true}
+    >
       {children}
     </motion.div>
   )
@@ -263,8 +272,14 @@ export function SwipeDeck({
   const onKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
       if (event.target !== event.currentTarget) return
-      if (event.key === 'ArrowRight' && index < count - 1) onIndexChange(index + 1)
-      if (event.key === 'ArrowLeft' && index > 0) onIndexChange(index - 1)
+      if (event.key === 'ArrowRight' && index < count - 1) {
+        event.preventDefault()
+        onIndexChange(index + 1)
+      }
+      if (event.key === 'ArrowLeft' && index > 0) {
+        event.preventDefault()
+        onIndexChange(index - 1)
+      }
     },
     [count, index, onIndexChange],
   )
@@ -290,7 +305,13 @@ export function SwipeDeck({
     >
       <motion.div style={{ x, width: width * count }} className="flex h-full">
         {children.map((child, childIndex) => (
-          <DeckPage key={childIndex} x={x} width={width} index={childIndex}>
+          <DeckPage
+            key={childIndex}
+            x={x}
+            width={width}
+            index={childIndex}
+            active={childIndex === index}
+          >
             {child}
           </DeckPage>
         ))}

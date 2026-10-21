@@ -53,136 +53,143 @@ export function ProfileScreen() {
   }, [analyses])
 
   return (
-    <section className="h-full overflow-y-auto overscroll-contain bg-background px-5 pb-28 safe-top">
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={() => setScreenIndex(1)}
-          aria-label="Open the camera"
-          className="grid size-11 place-items-center rounded-full bg-secondary text-foreground active:scale-[0.97]"
-        >
-          <Camera className="size-5" />
-        </button>
-      </div>
-
-      <div className="mt-4 flex items-center gap-4">
-        <Avatar className="size-16">
-          {user?.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.name} />}
-          <AvatarFallback className="text-2xl">{initials(user?.name ?? 'N')}</AvatarFallback>
-        </Avatar>
-        <div className="min-w-0 flex-1">
-          <h1 className="display truncate text-3xl font-medium">{user?.name}</h1>
-          <p className="truncate text-sm text-muted-foreground">{user?.email}</p>
-          <span className="mt-2 inline-flex items-center rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground">
-            {mode === 'supabase' ? 'Google account' : 'Demo account'}
-          </span>
-        </div>
-      </div>
-
-      <dl className="mt-8 grid grid-cols-3 gap-2">
-        {[
-          { label: 'Places', value: stats.places },
-          { label: 'Cities', value: stats.cities },
-          { label: 'Messages', value: stats.messages },
-        ].map((item) => (
-          <div key={item.label} className="rounded-2xl bg-secondary px-4 py-3">
-            <dd className="font-serif text-3xl tabular-nums">{item.value}</dd>
-            <dt className="text-xs text-muted-foreground">{item.label}</dt>
-          </div>
-        ))}
-      </dl>
-
-      <Group title="The guide">
-        <Row icon={<Globe />} title="Language" description="Language of the guide">
-          <Segmented
-            className="shrink-0"
-            label="Guide language"
-            value={guideLanguage}
-            onChange={(value) => {
-              setGuideLanguage(value)
-              haptic('light', hapticsEnabled)
-            }}
-            options={[
-              { value: 'en', label: 'EN' },
-              { value: 'tr', label: 'TR' },
-            ]}
-          />
-        </Row>
-        <Row icon={<Sparkles />} title="Welcome slides" description="Show the intro again">
-          <Button
-            variant="secondary"
-            size="sm"
-            className="shrink-0"
-            onClick={() => {
-              const userId = user?.id ?? ''
-              usePreferences.setState((state) => ({
-                onboarded: { ...state.onboarded, [userId]: false },
-              }))
-              toast('The welcome slides will show on next launch')
-            }}
+    <section className="h-full overflow-y-auto overscroll-contain bg-background pb-28">
+      <div className="mx-auto w-full max-w-2xl px-5 safe-top">
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => setScreenIndex(1)}
+            aria-label="Open the camera"
+            className="grid size-11 place-items-center rounded-full bg-secondary text-foreground active:scale-[0.97]"
           >
-            Show again
-          </Button>
-        </Row>
-      </Group>
+            <Camera className="size-5" />
+          </button>
+        </div>
 
-      <Group title="Appearance & feel">
-        <Row icon={<MonitorCog />} title="Appearance" description="Match your device or pick one" stacked>
-          <Segmented
-            label="Appearance"
-            value={appearance}
-            onChange={(value: Appearance) => setAppearance(value)}
-            options={[
-              { value: 'system', label: 'Auto' },
-              { value: 'light', label: 'Light' },
-              { value: 'dark', label: 'Dark' },
-            ]}
-          />
-        </Row>
-        <Row icon={<Vibrate />} title="Haptics" description="A gentle tap on capture">
-          <Switch
-            checked={hapticsEnabled}
-            onCheckedChange={(value) => {
-              setHaptics(value)
-              haptic('medium', value)
-            }}
-          />
-        </Row>
-      </Group>
-
-      <Group title="App">
-        <button
-          type="button"
-          onClick={async () => {
-            if (!canInstall) {
-              toast('Use your browser menu → “Add to Home Screen”')
-              return
-            }
-            const accepted = await promptInstall()
-            if (accepted) toast.success('Nekibuki was added to your home screen')
-          }}
-          className="flex min-h-12 w-full items-center gap-3 px-4 text-left active:bg-accent/60"
-        >
-          <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-secondary text-foreground/80 [&_svg]:size-4">
-            <Download />
-          </span>
-          <span className="min-w-0 flex-1 py-3">
-            <span className="block truncate text-[15px] font-medium">Install Nekibuki</span>
-            <span className="block truncate text-xs text-muted-foreground">
-              {installed
-                ? 'Already installed'
-                : canInstall
-                  ? 'Add it to your home screen'
-                  : 'Available from your browser menu'}
+        <div className="mt-4 flex items-center gap-4">
+          <Avatar className="size-16">
+            {user?.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.name} />}
+            <AvatarFallback className="text-2xl">{initials(user?.name ?? 'N')}</AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            <h1 className="display truncate text-3xl font-medium">{user?.name}</h1>
+            <p className="truncate text-sm text-muted-foreground">{user?.email}</p>
+            <span className="mt-2 inline-flex items-center rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground">
+              {mode === 'supabase' ? 'Google account' : 'Demo account'}
             </span>
-          </span>
-          <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-        </button>
+          </div>
+        </div>
+
+        <dl className="mt-8 grid grid-cols-3 gap-2">
+          {[
+            { label: 'Places', value: stats.places },
+            { label: 'Cities', value: stats.cities },
+            { label: 'Messages', value: stats.messages },
+          ].map((item) => (
+            <div key={item.label} className="rounded-2xl bg-secondary px-4 py-3">
+              <dd className="font-serif text-3xl tabular-nums">{item.value}</dd>
+              <dt className="text-xs text-muted-foreground">{item.label}</dt>
+            </div>
+          ))}
+        </dl>
+
+        <Group title="The guide">
+          <Row icon={<Globe />} title="Language" description="Language of the guide">
+            <Segmented
+              className="shrink-0"
+              label="Guide language"
+              value={guideLanguage}
+              onChange={(value) => {
+                setGuideLanguage(value)
+                haptic('light', hapticsEnabled)
+              }}
+              options={[
+                { value: 'en', label: 'EN' },
+                { value: 'tr', label: 'TR' },
+              ]}
+            />
+          </Row>
+          <Row icon={<Sparkles />} title="Welcome slides" description="Show the intro again">
+            <Button
+              variant="secondary"
+              size="sm"
+              className="shrink-0"
+              onClick={() => {
+                const userId = user?.id ?? ''
+                usePreferences.setState((state) => ({
+                  onboarded: { ...state.onboarded, [userId]: false },
+                }))
+                toast('The welcome slides will show on next launch')
+              }}
+            >
+              Show again
+            </Button>
+          </Row>
+        </Group>
+
+        <Group title="Appearance & feel">
+          <Row
+            icon={<MonitorCog />}
+            title="Appearance"
+            description="Match your device or pick one"
+            stacked
+          >
+            <Segmented
+              label="Appearance"
+              value={appearance}
+              onChange={(value: Appearance) => setAppearance(value)}
+              options={[
+                { value: 'system', label: 'Auto' },
+                { value: 'light', label: 'Light' },
+                { value: 'dark', label: 'Dark' },
+              ]}
+            />
+          </Row>
+          <Row icon={<Vibrate />} title="Haptics" description="A gentle tap on capture">
+            <Switch
+              checked={hapticsEnabled}
+              onCheckedChange={(value) => {
+                setHaptics(value)
+                haptic('medium', value)
+              }}
+            />
+          </Row>
+        </Group>
+
+        <Group title="App">
+          <button
+            type="button"
+            onClick={async () => {
+              if (!canInstall) {
+                toast('Use your browser menu → “Add to Home Screen”')
+                return
+              }
+              const accepted = await promptInstall()
+              if (accepted) toast.success('Nekibuki was added to your home screen')
+            }}
+            className="flex min-h-12 w-full items-center gap-3 px-4 text-left active:bg-accent/60"
+          >
+            <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-secondary text-foreground/80 [&_svg]:size-4">
+              <Download />
+            </span>
+            <span className="min-w-0 flex-1 py-3">
+              <span className="block truncate text-[15px] font-medium">Install Nekibuki</span>
+              <span className="block truncate text-xs text-muted-foreground">
+                {installed
+                  ? 'Already installed'
+                  : canInstall
+                    ? 'Add it to your home screen'
+                    : 'Available from your browser menu'}
+              </span>
+            </span>
+            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+          </button>
+        </Group>
 
         <button
           type="button"
           onClick={() => setConfirmClear(true)}
-          className="flex min-h-12 w-full items-center gap-3 px-4 text-left active:bg-accent/60"
+          className="mt-8 flex min-h-12 w-full items-center gap-3 rounded-2xl bg-card px-4 text-left shadow-[0_0_0_1px_var(--border)] active:bg-accent/60"
         >
           <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-secondary text-destructive [&_svg]:size-4">
             <Trash2 />
@@ -197,20 +204,20 @@ export function ProfileScreen() {
           </span>
           <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
         </button>
-      </Group>
 
-      <button
-        type="button"
-        onClick={() => void signOut()}
-        className="mt-8 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-card font-medium text-destructive shadow-[0_0_0_1px_var(--border)] active:scale-[0.99]"
-      >
-        <LogOut className="size-4" /> Sign out
-      </button>
+        <button
+          type="button"
+          onClick={() => void signOut()}
+          className="mt-8 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-card font-medium text-destructive shadow-[0_0_0_1px_var(--border)] active:scale-[0.99]"
+        >
+          <LogOut className="size-4" /> Sign out
+        </button>
 
-      <p className="mt-6 flex items-center justify-center gap-2 text-center text-xs text-muted-foreground">
-        <Info className="size-3.5" />
-        Nekibuki v0.1 · made for curious travellers
-      </p>
+        <p className="mt-6 flex items-center justify-center gap-2 text-center text-xs text-muted-foreground">
+          <Info className="size-3.5" />
+          Nekibuki v0.1 · made for curious travellers
+        </p>
+      </div>
 
       <Dialog open={confirmClear} onOpenChange={setConfirmClear}>
         <DialogContent>
