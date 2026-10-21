@@ -14,7 +14,7 @@ export const DialogOverlay = forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      'fixed inset-0 z-[90] bg-black/40 backdrop-blur-[2px] data-[state=closed]:animate-[nk-fade-out_160ms_ease-in] data-[state=open]:animate-[nk-fade-in_200ms_ease-out]',
+      'fixed inset-0 z-[90] bg-black/40 scrim-blur data-[state=closed]:animate-[nk-fade-out_160ms_ease-in] data-[state=open]:animate-[nk-fade-in_200ms_ease-out]',
       className,
     )}
     {...props}

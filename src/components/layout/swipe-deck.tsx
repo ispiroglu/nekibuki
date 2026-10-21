@@ -311,7 +311,14 @@ export function SwipeDeck({
       <span id={hintId} className="sr-only">
         Use the left and right arrow keys to change screen.
       </span>
-      <motion.div style={{ x, width: width * count }} className="flex h-full">
+      <motion.div
+        style={{ x, width: width * count }}
+        // The track is promoted to its own layer while it is being dragged,
+        // which keeps the swipe on the compositor. It is released again
+        // afterwards, so an idle deck does not hold on to three screens of
+        // texture.
+        className={cn('flex h-full', dragging && 'will-change-transform')}
+      >
         {children.map((child, childIndex) => (
           <DeckPage
             key={childIndex}

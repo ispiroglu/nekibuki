@@ -78,7 +78,7 @@ export function ViewfinderSettings({
       aria-label="Viewfinder settings"
       tabIndex={-1}
       className={cn(
-        'glass-dark pointer-events-auto flex w-max max-w-[calc(100vw-16px)] flex-col rounded-2xl p-[6px] text-white',
+        'glass-dark-live pointer-events-auto flex w-max max-w-[calc(100vw-16px)] flex-col rounded-2xl p-[6px] text-white',
         'ring-1 ring-black/40 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70',
         '[@media(max-height:460px)]:flex-row [@media(max-height:460px)]:items-center',
       )}

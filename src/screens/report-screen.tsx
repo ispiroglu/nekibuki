@@ -337,7 +337,8 @@ export function ReportScreen() {
 
         <motion.dl
           variants={reduceMotion ? undefined : staggerItem}
-          className="mt-8 grid grid-cols-2 gap-2"
+          className="mt-8 grid grid-cols-2 gap-2 lazy-paint"
+          style={{ containIntrinsicSize: 'auto 180px' }}
         >
           {report.quickFacts.map((fact) => (
             <div key={fact.label} className="min-w-0 rounded-2xl bg-secondary px-4 py-3">
@@ -386,7 +387,10 @@ export function ReportScreen() {
           <h2 className="text-title font-medium tracking-[-0.01em]">A closer look</h2>
           <div className="mt-5 space-y-7">
             {report.sections.map((section) => (
-              <article key={section.id}>
+              // The sections are the long tail of the guide. Off-screen ones
+              // are not laid out and not painted until the reader reaches
+              // them, which keeps a long report scrolling on a weak phone.
+              <article key={section.id} className="lazy-paint" style={{ containIntrinsicSize: 'auto 220px' }}>
                 <h3 className="text-headline font-medium leading-snug">{section.title}</h3>
                 <p className="mt-2 max-w-[32rem] font-serif text-reading leading-[1.7] text-foreground/80 [text-wrap:pretty]">
                   {section.body}

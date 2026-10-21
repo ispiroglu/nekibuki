@@ -30,6 +30,14 @@ export function CaptureController() {
     setError(null)
   }, [draft, setCapture])
 
+  // The guide is the next screen. Its chunk is fetched while the photo is
+  // still being analysed, so the report appears the moment the answer lands
+  // instead of waiting on the network.
+  useEffect(() => {
+    if (!draft) return
+    void import('@/screens/report-screen')
+  }, [draft])
+
   useEffect(() => {
     if (!draft || !repository) return
 

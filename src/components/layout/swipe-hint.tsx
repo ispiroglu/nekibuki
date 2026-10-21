@@ -32,7 +32,7 @@ export function SwipeHint() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 10 }}
           transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
-          className="glass-dark pointer-events-none absolute left-1/2 top-[calc(env(safe-area-inset-top)+6.25rem)] z-40 inline-flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-[12.5px] font-medium text-white"
+          className="glass-dark-live pointer-events-none absolute left-1/2 top-[calc(env(safe-area-inset-top)+6.25rem)] z-40 inline-flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-[12.5px] font-medium text-white"
         >
           <ArrowLeftRight className="size-3.5 text-brand-ink" />
           Swipe between the camera, your profile and your places

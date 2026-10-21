@@ -18,6 +18,16 @@ const DAY_RANK: Record<ReturnType<typeof groupDay>, number> = {
   earlier: 3,
 }
 
+/**
+ * How many rows take part in the entrance stagger.
+ *
+ * The stagger delays every row by a beat, so a long history used to spend
+ * seconds unrolling — and every one of those rows was an animation running
+ * at once. The first screenful arrives as a sequence; the rest is simply
+ * there.
+ */
+const STAGGER_LIMIT = 8
+
 export function HistoryScreen({
   onOpenCamera,
   active,
@@ -195,8 +205,12 @@ export function HistoryScreen({
             className="pb-safe px-3 pt-2"
           >
             <AnimatePresence initial={false}>
-              {ordered.map((analysis) => (
-                <HistoryRow key={analysis.id} analysis={analysis} />
+              {ordered.map((analysis, index) => (
+                <HistoryRow
+                  key={analysis.id}
+                  analysis={analysis}
+                  animate={index < STAGGER_LIMIT}
+                />
               ))}
             </AnimatePresence>
           </motion.ul>
@@ -206,7 +220,7 @@ export function HistoryScreen({
   )
 }
 
-function HistoryRow({ analysis }: { analysis: Analysis }) {
+function HistoryRow({ analysis, animate }: { analysis: Analysis; animate: boolean }) {
   const navigate = useNavigate()
   const [thumbFailed, setThumbFailed] = useState(false)
   const questionCount = analysis.messages.filter((message) => message.role === 'user').length
@@ -225,12 +239,17 @@ function HistoryRow({ analysis }: { analysis: Analysis }) {
     .join(', ')
 
   return (
-    <motion.li variants={staggerItem} layout>
+    <motion.li
+      variants={animate ? staggerItem : undefined}
+      initial={animate ? 'initial' : false}
+      layout
+    >
       <button
         type="button"
         onClick={() => navigate(`/report/${analysis.id}`)}
         aria-label={label}
-        className="flex w-full items-center gap-4 rounded-2xl p-2 text-left transition-colors active:bg-secondary"
+        className="flex w-full items-center gap-4 rounded-2xl p-2 text-left transition-colors active:bg-secondary lazy-paint"
+        style={{ containIntrinsicSize: 'auto 88px' }}
       >
         {analysis.previewUrl && !thumbFailed ? (
           <img

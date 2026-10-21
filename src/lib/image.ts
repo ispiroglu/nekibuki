@@ -1,6 +1,7 @@
 /** Photo preparation helpers. Everything here keeps the upload small and pleasant. */
 
 import { useCallback, useState } from 'react'
+import { encodeImage, hasImageWorker } from './image-worker-client'
 import { cn } from './utils'
 
 /** Widths offered to the report hero. The stored URL keeps its own crop and quality. */
@@ -46,6 +47,12 @@ const MAX_UPLOAD_EDGE = 1800
 const UPLOAD_QUALITY = 0.86
 const PREVIEW_EDGE = 720
 const PREVIEW_QUALITY = 0.72
+/**
+ * The capture is scaled to the upload size straight away. Nothing in the app
+ * ever shows the photo larger than that — the hero renders it at 1600px — so
+ * encoding a 2560px frame only buys bytes nobody looks at.
+ */
+const CAPTURE_EDGE = MAX_UPLOAD_EDGE
 
 async function decode(blob: Blob): Promise<{ width: number; height: number; draw: CanvasImageSource } | null> {
   if ('createImageBitmap' in window) {
@@ -96,15 +103,62 @@ async function renderToBlob(
   return new Promise((resolve) => canvas.toBlob((result) => resolve(result), type, quality))
 }
 
+/**
+ * Encodes an image in the worker, or returns null when the worker cannot do
+ * it — an old browser, a WebView without `OffscreenCanvas`, a decode the
+ * device refused. The caller then takes the main-thread road.
+ */
+async function encodeInWorker(
+  request: Parameters<typeof encodeImage>[0],
+  transfer: Transferable[] = [],
+): Promise<{ blob?: Blob; dataUrl?: string } | null> {
+  try {
+    return await encodeImage(request, transfer)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Grabs the current video frame as a bitmap.
+ *
+ * `createImageBitmap` of a video frame is a GPU-side copy: the main thread
+ * hands over a handle to the decoded frame, never the pixels themselves.
+ */
+async function grabFrame(video: HTMLVideoElement): Promise<ImageBitmap | null> {
+  if (typeof createImageBitmap !== 'function') return null
+  try {
+    return await createImageBitmap(video)
+  } catch {
+    return null
+  }
+}
+
 /** Shrinks a photo to a friendly size for the vision model. */
 export async function compressImage(blob: Blob): Promise<Blob> {
   if (blob.type === 'image/png' && blob.size < 900_000) return blob
+  const encoded = await encodeInWorker({
+    source: blob,
+    maxEdge: MAX_UPLOAD_EDGE,
+    quality: UPLOAD_QUALITY,
+    mime: 'image/jpeg',
+    output: 'blob',
+  })
+  if (encoded?.blob) return encoded.blob
   const compressed = await renderToBlob(blob, MAX_UPLOAD_EDGE, UPLOAD_QUALITY)
   return compressed ?? blob
 }
 
 /** A tiny base64 thumbnail used in history lists. */
 export async function createPreviewDataUrl(blob: Blob): Promise<string | null> {
+  const encoded = await encodeInWorker({
+    source: blob,
+    maxEdge: PREVIEW_EDGE,
+    quality: PREVIEW_QUALITY,
+    mime: 'image/jpeg',
+    output: 'dataUrl',
+  })
+  if (encoded?.dataUrl) return encoded.dataUrl
   const preview = await renderToBlob(blob, PREVIEW_EDGE, PREVIEW_QUALITY)
   if (!preview) return null
   return new Promise((resolve) => {
@@ -174,10 +228,36 @@ function cropForViewfinder(video: HTMLVideoElement): CoverSourceRect | null {
 }
 
 /** Grabs the current video frame as a JPEG blob, cropped to the visible viewfinder. */
-export function captureVideoFrame(video: HTMLVideoElement, quality = 0.92): Promise<Blob | null> {
-  if (!video.videoWidth || !video.videoHeight) return Promise.resolve(null)
+export async function captureVideoFrame(
+  video: HTMLVideoElement,
+  quality = 0.92,
+): Promise<Blob | null> {
+  if (!video.videoWidth || !video.videoHeight) return null
 
   const crop = cropForViewfinder(video)
+
+  // The fast path: the frame goes to the worker as a bitmap, the crop and the
+  // encode happen there, and the main thread only ever sees the finished blob.
+  if (hasImageWorker()) {
+    const bitmap = await grabFrame(video)
+    if (bitmap) {
+      const encoded = await encodeInWorker(
+        {
+          source: bitmap,
+          crop: crop
+            ? { x: crop.x, y: crop.y, width: crop.width, height: crop.height }
+            : undefined,
+          maxEdge: CAPTURE_EDGE,
+          quality,
+          mime: 'image/jpeg',
+          output: 'blob',
+        },
+        [bitmap],
+      )
+      if (encoded?.blob) return encoded.blob
+    }
+  }
+
   const width = crop?.width ?? video.videoWidth
   const height = crop?.height ?? video.videoHeight
 
@@ -185,7 +265,7 @@ export function captureVideoFrame(video: HTMLVideoElement, quality = 0.92): Prom
   canvas.width = width
   canvas.height = height
   const context = canvas.getContext('2d')
-  if (!context) return Promise.resolve(null)
+  if (!context) return null
   context.drawImage(
     video,
     crop?.x ?? 0,
@@ -205,14 +285,35 @@ export function captureVideoFrame(video: HTMLVideoElement, quality = 0.92): Prom
  * A small still of the current viewfinder, used to hide the black gap while the
  * camera restarts. Same crop as the saved photo, just at preview resolution.
  */
-export function captureVideoStill(
+export async function captureVideoStill(
   video: HTMLVideoElement,
   maxWidth = 640,
   quality = 0.62,
-): string | null {
+): Promise<string | null> {
   if (!video.videoWidth || !video.videoHeight) return null
 
   const crop = cropForViewfinder(video)
+
+  if (hasImageWorker()) {
+    const bitmap = await grabFrame(video)
+    if (bitmap) {
+      const encoded = await encodeInWorker(
+        {
+          source: bitmap,
+          crop: crop
+            ? { x: crop.x, y: crop.y, width: crop.width, height: crop.height }
+            : undefined,
+          width: maxWidth,
+          quality,
+          mime: 'image/jpeg',
+          output: 'dataUrl',
+        },
+        [bitmap],
+      )
+      if (encoded?.dataUrl) return encoded.dataUrl
+    }
+  }
+
   const sourceWidth = crop?.width ?? video.videoWidth
   const sourceHeight = crop?.height ?? video.videoHeight
   const scale = Math.min(1, maxWidth / sourceWidth)

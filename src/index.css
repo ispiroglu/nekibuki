@@ -305,8 +305,14 @@
     background: color-mix(in srgb, var(--background) 72%, transparent);
   }
 
-  -webkit-backdrop-filter: blur(24px) saturate(1.8);
-  backdrop-filter: blur(24px) saturate(1.8);
+  /*
+   * The blur radius is the cost of a backdrop filter: it sets the kernel
+   * length, and every pixel under the glass is recomputed whenever the
+   * backdrop moves. 12px reads the same as 24px over a 72% opaque paper fill
+   * and costs half as much.
+   */
+  -webkit-backdrop-filter: blur(12px) saturate(1.5);
+  backdrop-filter: blur(12px) saturate(1.5);
 }
 
 /*
@@ -318,8 +324,69 @@
 @utility glass-dark {
   background: rgba(14, 14, 13, 0.62);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  -webkit-backdrop-filter: blur(20px) saturate(1.8);
-  backdrop-filter: blur(20px) saturate(1.8);
+  -webkit-backdrop-filter: blur(12px) saturate(1.5);
+  backdrop-filter: blur(12px) saturate(1.5);
+}
+
+/*
+ * Glass over the live viewfinder.
+ *
+ * The camera backdrop changes every frame, so a backdrop filter on top of it
+ * is recomputed every frame as well — the most expensive backdrop filter
+ * there is. The scrim is already 62% opaque, so the frost reads as a soft
+ * darkening rather than as detail: a short blur without the saturate pass
+ * keeps the look at a fraction of the per-frame cost.
+ */
+@utility glass-dark-live {
+  background: rgba(14, 14, 13, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+/*
+ * The scrim behind a sheet or a dialog.
+ *
+ * A two-pixel blur is enough to take the edge off the page underneath, and
+ * it is a full-screen filter while it is there — so it lives in a class of
+ * its own, which the lean tier can switch off.
+ */
+@utility scrim-blur {
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+
+/*
+ * Long content paints only what is on screen.
+ *
+ * `content-visibility: auto` lets the browser skip the layout and the paint
+ * of an off-screen subtree. `contain-intrinsic-size` keeps the room that
+ * subtree would have taken, so the scrollbar never jumps; the `auto` keyword
+ * remembers the real size once it has been rendered.
+ */
+@utility lazy-paint {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 96px;
+}
+
+/*
+ * The lean tier.
+ *
+ * On a device that cannot keep up, the frost goes and the scrim stays: the
+ * same colours and the same contrast, none of the per-frame filter cost. The
+ * paper glass becomes opaque, because without a blur a translucent header
+ * over scrolling text is unreadable.
+ */
+[data-power='lean'] .glass,
+[data-power='lean'] .glass-dark,
+[data-power='lean'] .glass-dark-live,
+[data-power='lean'] .scrim-blur {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+[data-power='lean'] .glass {
+  background: var(--background);
 }
 
 @utility safe-top {

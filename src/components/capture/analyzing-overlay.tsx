@@ -3,6 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { RotateCcw, X } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { powerTier } from '@/lib/device'
 import { usePreferences } from '@/store/preferences'
 import { spring } from '@/lib/motion'
 
@@ -12,6 +13,53 @@ const FOCUSABLE =
 
 /** The shutter on the camera panel, used when the browser did not focus it. */
 const SHUTTER = '[aria-label="Take a photo"]'
+
+/**
+ * The blurred backdrop behind the analysis card.
+ *
+ * A `blur-2xl` over a full-screen photograph is the most expensive thing on
+ * this screen: the filter is rasterised again for every frame the scan line
+ * animates. So the photo is drawn once into a forty-pixel bitmap and the
+ * browser scales that up — the same soft image, at no per-frame cost.
+ */
+function BlurredBackdrop({ src }: { src: string }) {
+  const [tiny, setTiny] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    const image = new Image()
+    image.onload = () => {
+      if (cancelled) return
+      const width = 40
+      const height = Math.max(1, Math.round((image.naturalHeight / image.naturalWidth) * width))
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const context = canvas.getContext('2d')
+      if (!context) return
+      context.drawImage(image, 0, 0, width, height)
+      try {
+        setTiny(canvas.toDataURL('image/jpeg', 0.7))
+      } catch {
+        setTiny(null)
+      }
+    }
+    image.src = src
+    return () => {
+      cancelled = true
+    }
+  }, [src])
+
+  if (!tiny) return null
+  return (
+    <img
+      src={tiny}
+      alt=""
+      aria-hidden
+      className="absolute inset-0 size-full scale-110 object-cover opacity-25"
+    />
+  )
+}
 
 export function AnalyzingOverlay({
   previewUrl,
@@ -26,6 +74,7 @@ export function AnalyzingOverlay({
 }) {
   const language = usePreferences((state) => state.guideLanguage)
   const messages = ANALYZING_MESSAGES[language]
+  const tier = powerTier()
   const [messageIndex, setMessageIndex] = useState(0)
   const [elapsed, setElapsed] = useState(0)
   const [steps, setSteps] = useState('')
@@ -143,12 +192,13 @@ export function AnalyzingOverlay({
         </p>
       )}
 
-      <img
-        src={previewUrl}
-        alt=""
-        aria-hidden
-        className="absolute inset-0 size-full scale-110 object-cover opacity-25 blur-2xl"
-      />
+      {tier === 'full' ? (
+        <BlurredBackdrop src={previewUrl} />
+      ) : (
+        // On a device that cannot afford the frost, the photograph behind the
+        // card is a wash of colour rather than a picture.
+        <div aria-hidden className="absolute inset-0 bg-black/60" />
+      )}
       <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/30 to-black/80" />
 
       <div className="relative flex w-full max-w-sm flex-col items-center">

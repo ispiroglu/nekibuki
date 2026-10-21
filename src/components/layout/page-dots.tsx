@@ -25,7 +25,10 @@ export function PageDots({
       aria-label="Screens"
       className={cn(
         'flex items-center gap-2 rounded-full p-1',
-        tone === 'dark' ? 'glass-dark' : 'glass',
+        // The dark tone only ever sits over the live viewfinder, so it takes
+        // the cheaper glass: a backdrop filter over moving video is redrawn
+        // on every frame.
+        tone === 'dark' ? 'glass-dark-live' : 'glass',
         className,
       )}
     >

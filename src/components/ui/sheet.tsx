@@ -104,7 +104,7 @@ export function Sheet({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.22, ease: 'easeOut' }}
             onClick={() => onOpenChange(false)}
-            className="absolute inset-0 cursor-default bg-black/35 backdrop-blur-[2px]"
+            className="absolute inset-0 cursor-default bg-black/35 scrim-blur"
           />
           <motion.section
             ref={panelRef}

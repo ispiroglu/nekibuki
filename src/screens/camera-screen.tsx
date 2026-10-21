@@ -19,6 +19,7 @@ import { Logo } from '@/components/brand/logo'
 import { formatZoom, ViewfinderSettings } from '@/components/capture/viewfinder-settings'
 import { Button } from '@/components/ui/button'
 import { captureVideoFrame, captureVideoStill, coverSourceRect } from '@/lib/image'
+import { warmImageWorker } from '@/lib/image-worker-client'
 import { haptic } from '@/lib/haptics'
 import { cn, clamp } from '@/lib/utils'
 import { useAppStore } from '@/store/app'
@@ -197,8 +198,12 @@ export function CameraScreen({
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: facing === 'environment' ? { ideal: 'environment' } : 'user',
-            width: { ideal: 2560 },
-            height: { ideal: 1440 },
+            // 1080p is the point where the capture stops getting sharper: the
+            // photo is scaled to 1800px for the model and the hero renders it
+            // at 1600px. A 4K stream costs decode bandwidth and battery on a
+            // mid-range phone and buys nothing the user can see.
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
           },
           audio: false,
         })
@@ -224,13 +229,19 @@ export function CameraScreen({
         setTorch(false)
         setStatus('ready')
 
+        // The photo pipeline lives in a worker. Start it while the viewfinder
+        // is still opening, so the shutter press does not pay for it.
+        warmImageWorker()
+
         // Keep the last painted frame so leaving and re-entering the camera never
         // drops back to a black overlay while the new stream warms up.
         const video = videoRef.current
         const snapshot = () => {
-          if (cancelled) return
-          const still = video ? captureVideoStill(video) : null
-          if (still) setStillUrl(still)
+          if (cancelled || !video) return
+          void captureVideoStill(video).then((still) => {
+            if (cancelled || !still) return
+            setStillUrl(still)
+          })
         }
         if (video && typeof video.requestVideoFrameCallback === 'function') {
           video.requestVideoFrameCallback(() => snapshot())
@@ -313,7 +324,9 @@ export function CameraScreen({
       if (settingsTriggerRef.current?.contains(target)) return
       closeSettings()
     }
-    document.addEventListener('pointerdown', closeOnOutsidePointer)
+    // The listener only watches; it never cancels the event, so the browser
+    // is free to keep scrolling while it runs.
+    document.addEventListener('pointerdown', closeOnOutsidePointer, { passive: true })
     return () => document.removeEventListener('pointerdown', closeOnOutsidePointer)
   }, [closeSettings, settingsOpen])
 
@@ -539,7 +552,7 @@ export function CameraScreen({
       }
       setLocationMenuOpen(false)
     }
-    document.addEventListener('pointerdown', closeOnOutsidePointer)
+    document.addEventListener('pointerdown', closeOnOutsidePointer, { passive: true })
     return () => document.removeEventListener('pointerdown', closeOnOutsidePointer)
   }, [locationMenuOpen])
 
@@ -638,7 +651,11 @@ export function CameraScreen({
             'transition-[opacity,filter] duration-700 ease-out',
             facing === 'user' && '-scale-x-100',
             status === 'ready' ? 'opacity-100' : 'opacity-0',
-            revealed ? 'blur-0' : 'blur-[14px]',
+            // The soft focus belongs to the small window the stream opens in.
+            // Once the window is open the filter is removed outright: a live
+            // video layer with a filter on it pays for a full-screen filter
+            // pass on every single frame, for a blur that no longer shows.
+            status === 'ready' && !revealed ? 'blur-[14px]' : '',
           )}
         />
 
@@ -648,12 +665,13 @@ export function CameraScreen({
             alt=""
             aria-hidden
             initial={false}
-            animate={{
-              opacity: revealed ? 0 : 1,
-              filter: revealed ? 'blur(0px)' : 'blur(4px)',
-            }}
+            animate={{ opacity: revealed ? 0 : 1 }}
             transition={reduceMotion ? { duration: 0 } : { duration: 0.45, ease: 'easeOut' }}
-            className="pointer-events-none absolute inset-0 size-full object-cover"
+            className={cn(
+              'pointer-events-none absolute inset-0 size-full object-cover',
+              'transition-[filter] duration-700 ease-out',
+              !revealed && 'blur-[4px]',
+            )}
           />
         )}
 
@@ -769,7 +787,7 @@ export function CameraScreen({
           >
             <span
               className={cn(
-                'glass-dark inline-flex min-h-[44px] min-w-[56px] items-center justify-center rounded-full px-[12px] text-sm font-semibold tabular-nums text-white',
+                'glass-dark-live inline-flex min-h-[44px] min-w-[56px] items-center justify-center rounded-full px-[12px] text-sm font-semibold tabular-nums text-white',
                 hudEdge,
               )}
             >
@@ -848,7 +866,7 @@ export function CameraScreen({
             aria-controls={settingsOpen ? settingsPanelId : undefined}
             disabled={status !== 'ready'}
             className={cn(
-              'glass-dark pointer-events-auto grid size-[44px] shrink-0 place-items-center rounded-full text-hud transition-transform duration-150 ease-out active:scale-95 disabled:opacity-40',
+              'glass-dark-live pointer-events-auto grid size-[44px] shrink-0 place-items-center rounded-full text-hud transition-transform duration-150 ease-out active:scale-95 disabled:opacity-40',
               'aria-expanded:bg-white/15',
               hudEdge,
             )}
@@ -866,7 +884,7 @@ export function CameraScreen({
                 aria-expanded={locationStatus === 'ready' ? locationMenuOpen : undefined}
                 aria-controls={locationStatus === 'ready' ? locationMenuId : undefined}
                 className={cn(
-                  'glass-dark flex min-h-[44px] min-w-0 max-w-full items-center gap-[6px] rounded-full px-[12px] py-[6px] text-xs font-medium text-white/95 transition-transform duration-150 ease-out active:scale-[0.98]',
+                  'glass-dark-live flex min-h-[44px] min-w-0 max-w-full items-center gap-[6px] rounded-full px-[12px] py-[6px] text-xs font-medium text-white/95 transition-transform duration-150 ease-out active:scale-[0.98]',
                   hudEdge,
                 )}
               >
@@ -893,7 +911,7 @@ export function CameraScreen({
                     exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -6, scale: 0.98 }}
                     transition={reduceMotion ? { duration: 0 } : { duration: 0.16, ease: 'easeOut' }}
                     className={cn(
-                      'glass-dark absolute left-1/2 top-full z-20 mt-2 flex -translate-x-1/2 flex-col overflow-hidden rounded-2xl text-left text-sm',
+                      'glass-dark-live absolute left-1/2 top-full z-20 mt-2 flex -translate-x-1/2 flex-col overflow-hidden rounded-2xl text-left text-sm',
                       hudEdge,
                     )}
                   >
@@ -940,7 +958,7 @@ export function CameraScreen({
             onClick={onOpenHistory}
             aria-label="Open places"
             className={cn(
-              'glass-dark pointer-events-auto grid size-[44px] shrink-0 place-items-center rounded-full text-white transition-transform duration-150 ease-out active:scale-95',
+              'glass-dark-live pointer-events-auto grid size-[44px] shrink-0 place-items-center rounded-full text-white transition-transform duration-150 ease-out active:scale-95',
               hudEdge,
             )}
           >
@@ -957,7 +975,7 @@ export function CameraScreen({
           */}
           <div className="w-full basis-full">
             <p
-              className="glass-dark pointer-events-none mx-auto w-fit max-w-full truncate rounded-full px-[12px] py-[4px] text-xs font-medium text-white"
+              className="glass-dark-live pointer-events-none mx-auto w-fit max-w-full truncate rounded-full px-[12px] py-[4px] text-xs font-medium text-white"
             >
               Point at one thing
             </p>
@@ -1049,7 +1067,7 @@ export function CameraScreen({
               onClick={() => fileInputRef.current?.click()}
               aria-label="Choose from gallery"
               className={cn(
-                'glass-dark pointer-events-auto grid size-[48px] shrink-0 place-items-center overflow-hidden rounded-xl text-white transition-transform duration-150 ease-out active:scale-95',
+                'glass-dark-live pointer-events-auto grid size-[48px] shrink-0 place-items-center overflow-hidden rounded-xl text-white transition-transform duration-150 ease-out active:scale-95',
                 hudEdge,
               )}
             >
@@ -1080,7 +1098,7 @@ export function CameraScreen({
               }}
               aria-label="Switch camera"
               className={cn(
-                'glass-dark pointer-events-auto grid size-[48px] shrink-0 place-items-center rounded-xl text-white transition-transform duration-150 ease-out active:scale-95',
+                'glass-dark-live pointer-events-auto grid size-[48px] shrink-0 place-items-center rounded-xl text-white transition-transform duration-150 ease-out active:scale-95',
                 hudEdge,
               )}
             >
@@ -1117,7 +1135,7 @@ export function CameraScreen({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-5 overflow-y-auto bg-black/85 px-6 py-10 text-center outline-none backdrop-blur-md safe-top safe-bottom"
+            className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-5 overflow-y-auto bg-black/85 px-6 py-10 text-center outline-none scrim-blur safe-top safe-bottom"
           >
             <div className="grid size-14 shrink-0 place-items-center rounded-2xl bg-white/10 ring-1 ring-white/15">
               {status === 'denied' ? (

@@ -253,6 +253,20 @@ Its scrim is `rgb(14 14 13 / .62)`: white on it measures 5.4:1 even over a blown
 6.8:1 over a mid-bright wall, so a HUD label survives arbitrary photography. The paper glass
 (`glass`) is a separate token and carries no scrim.
 
+**Three glass tokens, one look.** A backdrop filter is recomputed for every pixel it covers, and
+the radius sets the kernel cost — so the radius is part of the token, not a detail.
+
+| Token | Radius | Where |
+| --- | --- | --- |
+| `glass` | 12px, saturate 1.5 | Paper surfaces: sticky headers, sheets |
+| `glass-dark` | 12px, saturate 1.5 | Over a still photograph |
+| `glass-dark-live` | 8px, no saturate | Over the live viewfinder, where the backdrop moves every frame |
+
+On the **lean tier** — a device with four cores or less, four gigabytes of memory or less, or a
+saved-data connection — every frost is switched off and the scrim carries the contrast on its own.
+The tier is decided once, before the first paint, and written to the document as `data-power`.
+It removes decoration only; no information is ever withheld.
+
 ### Shadow Vocabulary
 - **Hairline ring** (`box-shadow: 0 0 0 1px var(--border)`): cards and grouped rows at rest.
 - **Ambient** (`0 1px 2px rgb(20 20 19 / .04), 0 12px 32px -22px rgb(20 20 19 / .28)`): floating

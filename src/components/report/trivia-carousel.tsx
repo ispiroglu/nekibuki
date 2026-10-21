@@ -136,7 +136,9 @@ export function TriviaCarousel({ trivia }: { trivia: Trivia[] }) {
               <span
                 key={item.id}
                 className={cn(
-                  'h-1.5 rounded-full transition-all',
+                  // Width and colour only: `transition-all` would animate the
+                  // layout of every dot in the row.
+                  'h-1.5 rounded-full transition-[width,background-color]',
                   index === activeIndex ? 'w-5 bg-brand' : 'w-1.5 bg-border',
                 )}
               />

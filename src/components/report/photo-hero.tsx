@@ -377,7 +377,11 @@ export function PhotoHero({
               >
                 <span
                   className={cn(
-                    'relative grid size-[36px] place-items-center rounded-full text-[13px] font-semibold tabular-nums transition-all duration-300',
+                    // Only the cheap properties transition. `transition-all`
+                    // would also animate the frost in and out of the marker,
+                    // and animating a blur is a repaint of the backdrop on
+                    // every frame of the animation.
+                    'relative grid size-[36px] place-items-center rounded-full text-[13px] font-semibold tabular-nums transition-[transform,background-color,color,box-shadow,border-color] duration-300',
                     isActive
                       ? 'scale-110 bg-hud text-hud-fg ring-2 ring-black/25'
                       : 'border border-white/30 bg-black/55 text-white backdrop-blur-md',

@@ -111,7 +111,8 @@ src/
     report/       photo hero with tappable annotations, trivia carousel, chat panel
     capture/      capture controller, analyzing overlay
     ui/           shadcn-style primitives
-  lib/            auth, api client, repositories (local + supabase), image, geo, motion
+  lib/            auth, api client, repositories (local + supabase), image, image worker,
+                  device tier, geo, motion
   store/          zustand stores (app, preferences, location)
 worker/           Hono app, vision providers, prompts
 shared/           domain types, zod schemas, mock reports (used by app and worker)
@@ -131,6 +132,32 @@ a carousel library, so the animation stays interruptible mid-swipe.
   (needs a dev server on :5173).
 - `bun run brand:shots` — captures the same screens under every brand preset and writes a
   contact sheet to `SHOT_DIR/index.html` (default `shots/brand`).
+- `bun run smoke` — end-to-end check: sign in, capture, read the report, ask a question, confirm
+  it reached history. Point it anywhere with `BASE_URL=https://nekibuki.thecrafter.io`.
+- `bun run perf` — the performance guard: the photo pipeline runs in the worker, the camera
+  chrome keeps a cheap frost, the analysing overlay paints no full-screen blur, long content is
+  painted lazily, and the shutter press costs no long frame.
+
+## Performance
+
+Three things carry the frame budget, and each has a guard.
+
+**The photo pipeline runs in a worker.** Capturing, cropping, scaling and encoding a frame is
+millions of pixels and a software JPEG encoder; on the main thread that stalls the frame the
+traveller is looking at. `src/lib/image.worker.ts` does it with `OffscreenCanvas`, fed by a
+zero-copy `ImageBitmap` handoff. Browsers without `OffscreenCanvas` fall back to the main thread.
+
+**Nothing frosts a moving backdrop.** A backdrop filter is recomputed for every pixel it covers,
+every frame. The live viewfinder gets its own short-blur token (`glass-dark-live`), the
+analysing overlay paints a photograph once into a forty-pixel bitmap instead of blurring a
+full-screen image on every frame, and the live video carries no filter at all.
+
+**Weak devices get less decoration, never less information.** The power tier is read once,
+before the first paint, and written to the document as `data-power`. On the lean tier the frost
+is off and the scrim carries the contrast alone.
+
+The measured effect, in a software rasteriser with a four-times CPU throttle: the analysing
+overlay rasterises about half as much, and scrolling a guide rasterises about a third less.
 
 ## Brand colour lab
 
@@ -158,9 +185,6 @@ to the default. The floating switcher is compiled out of production builds.
 - [`DESIGN.md`](DESIGN.md) — machine-readable tokens plus the rules for using them.
 - [`docs/design-findings.md`](docs/design-findings.md) — the Impeccable audit, split into
   file-owned workstreams for parallel implementation.
-
-- `bun run smoke` — end-to-end check: sign in, capture, read the report, ask a question, confirm
-  it reached history. Point it anywhere with `BASE_URL=https://nekibuki.thecrafter.io`.
 
 ## Status
 
