@@ -11,6 +11,8 @@ colors:
   brand: "#0f5f57"
   brand-ink: "#0f5f57"
   brand-fg: "#f2fbf8"
+  brand-dark: "#2f8f83"
+  brand-fg-dark: "#141413"
   hud: "#6cc0b0"
   hud-fg: "#141413"
   photo-ink: "#ffffff"
@@ -28,6 +30,27 @@ typography:
     fontWeight: 500
     lineHeight: 1.05
     letterSpacing: "-0.02em"
+  title:
+    fontFamily: "Newsreader Variable, ui-serif, Georgia, serif"
+    fontSize: "1.875rem"
+    fontWeight: 500
+    lineHeight: 1.15
+    letterSpacing: "-0.02em"
+  headline:
+    fontFamily: "system-ui, -apple-system, SF Pro Text, Segoe UI, Roboto, Helvetica Neue, sans-serif"
+    fontSize: "1.5rem"
+    fontWeight: 500
+    lineHeight: 1.15
+  lede:
+    fontFamily: "Newsreader Variable, ui-serif, Georgia, serif"
+    fontSize: "1.375rem"
+    fontWeight: 400
+    lineHeight: 1.55
+  value:
+    fontFamily: "Newsreader Variable, ui-serif, Georgia, serif"
+    fontSize: "1.125rem"
+    fontWeight: 400
+    lineHeight: 1.3
   reading:
     fontFamily: "Newsreader Variable, ui-serif, Georgia, serif"
     fontSize: "1.0625rem"
@@ -58,11 +81,6 @@ typography:
     fontSize: "15px"
     fontWeight: 400
     lineHeight: 1.4
-  lede:
-    fontFamily: "Newsreader Variable, ui-serif, Georgia, serif"
-    fontSize: "1.375rem"
-    fontWeight: 400
-    lineHeight: 1.55
 rounded:
   sm: "8.4px"
   md: "11.2px"
@@ -115,11 +133,16 @@ exception: there the interface becomes thin marks over a live photograph.
 One hue, three jobs. The accent is a signature, not a theme.
 
 ### Primary
-- **Petrol Green** (`#0f5f57`, `oklch(43.9% 0.073 184.5)`): the single brand hue. Used for the
+- **Petrol Green** (`#0f5f57` light, `#2f8f83` dark): the single brand hue. Used for the
   logo core, numbered reference dots, the send action, and brand-tinted text on paper.
+  Night mode lifts the fill to a step that still reads as an edge on dark paper — 4.26:1
+  there, where the light fill would be 2.22:1. Every brand preset states its own dark
+  fill, so none of them silently inherits the light-mode one.
 - **Petrol Ink** (`#0f5f57` light, `#7fc7bb` dark): the accessible text version of the hue.
   Focus rings use this token, not the fill.
-- **Petrol Foreground** (`#f2fbf8`): ink that sits on a petrol fill.
+- **Petrol Foreground** (`#f2fbf8` light, `#141413` dark): ink that sits on a petrol fill.
+  The fill decides the ink — a deep fill takes a pale ink, a lifted fill takes the dark
+  ink. On the night fill the pair measures 4.72:1.
 
 ### Neutral
 - **Paper** (`#faf9f5`): the page. Never pure white.
@@ -134,6 +157,9 @@ One hue, three jobs. The accent is a signature, not a theme.
 - **HUD Mint** (`#6cc0b0`) and **HUD Ink** (`#141413`): marks drawn over a photograph —
   viewfinder ring, scan line, active annotation marker. These are deliberately lighter and more
   chromatic than the brand ink because they must survive arbitrary photography.
+- **A HUD fill always takes `--hud-fg` ink.** Never white, never `--photo-ink`: white on
+  `--hud` measures 2.14:1, `--hud-fg` on `--hud` measures 8.61:1. A HUD-filled circle carries
+  dark ink, full stop.
 - Active photo markers pair the HUD fill with a 2px `rgb(0 0 0 / 0.25)` ring. Without it, a pale
   marker disappears against a bright sky.
 - Text sitting directly on a photograph uses `photo-ink` with a two-layer `photo-shadow`
@@ -147,8 +173,15 @@ colour, and it appears only on destructive actions.
 **The Role Rule.** `--brand` fills, `--brand-ink` writes on paper, `--brand-fg` writes on brand,
 `--hud` marks photography, `--hud-fg` writes on HUD. Never use one token for another role.
 
-**The Anti-Terracotta Rule.** Terracotta `#d97757` is an experiment, not the identity. It reads as
-another product's brand and fails 3:1 on paper.
+**The Fill Rule.** A brand fill clears 3:1 against the page it sits on, in every theme, and
+the ink on a fill clears 4.5:1 against that fill. The fill decides the ink: a deep fill
+takes a pale ink, a lifted fill takes the dark ink.
+
+**The Anti-Terracotta Rule.** Terracotta is an experiment, not the identity: it reads as
+another product's brand. The experiment ships as `#c25f3f`, which measures **3.98:1** on
+paper — over the 3:1 the system demands of a fill — with `#a8452a` as its ink (5.62:1 on
+paper) and `#180a05` on the fill (4.61:1). The first cut, `#d97757`, measured 2.96:1 on
+paper and is not allowed back. The gate is the measurement, not the flag.
 
 ## Typography
 
@@ -161,19 +194,27 @@ device's own sans for anything they should *operate*. The pairing makes the guid
 while the controls feel native.
 
 ### Hierarchy
+A ramp, not a bag of sizes. Every size the system names is a step, and two jobs that meet in
+the same surface are never less than 4px apart.
+
 - **Display** (500, 2.25–3rem, 1.05): place names, screen titles, onboarding headlines.
   Letter-spacing −0.02em.
-- **Headline** (500, 1.5rem, 1.15): section titles inside a report.
+- **Title** (500, 1.875rem, 1.15): a screen title that sits above a section — a profile name,
+  a report section heading.
+- **Headline** (500, 1.5rem, 1.15): section titles inside a report, and the title of a
+  numbered reference.
+- **Lede** (400, 1.375rem, 1.55): the report introduction, between Reading and Headline.
+- **Value** (400, 1.125rem, 1.3): a standalone serif line — a quick-fact value, a stat, the
+  onboarding greeting.
 - **Reading** (400, 1.0625rem, 1.7): report prose and guide answers. Keep line length 55–70ch;
   never wider than 34rem for a measure.
 - **Body** (400, 1rem, 1.5): controls, metadata, list rows.
+- **List** (400, 15px, 1.4): settings and history row titles.
+- **UI** (500, 13px, 1.2): buttons, segmented controls, compact chips.
 - **Label** (500, 0.75rem, 0.06em, uppercase): group headings and eyebrow labels.
 - **Meta** (500, 0.7rem, 0.06em, uppercase): the smallest allowed step, for dense metadata
   inside a card or a report header. Never smaller than 0.7rem (11.2px); the old onboarding
   0.6rem was below the floor.
-- **UI** (500, 13px, 1.2): buttons, segmented controls, compact chips.
-- **List** (400, 15px, 1.4): settings and history row titles.
-- **Lede** (400, 1.375rem, 1.55): the report introduction, between Reading and Headline.
 
 ### Named Rules
 **The Two-Voice Rule.** Serif is for content; sans is for chrome. A button label never uses the
@@ -181,6 +222,13 @@ serif, and a report paragraph never uses the sans.
 
 **The 0.7rem Floor Rule.** Uppercase labels never go below 0.7rem (11.2px); use 12px where the
 layout allows. If a label must be smaller to fit, the layout is wrong.
+
+**The Ramp Rule.** The steps are 30, 24, 22, 18, 17, 16, 15, 13, 12 and 11.2 pixels, plus the
+36–48 display range. A screen never invents a size of its own: each step has a utility —
+`text-title`, `text-headline`, `text-lede`, `text-value`, `text-reading`, `text-body`,
+`text-list`, `text-ui`, `text-label`, `text-meta`. Two jobs that meet in the same surface are
+never less than 4px apart. Where two steps are closer than that — 18 and 17 — they never share
+a surface: a value sits in a stat grid, reading sits in a paragraph.
 
 ## Layout
 
@@ -201,6 +249,9 @@ least 7rem of bottom padding so the last row can clear it.
 Depth is drawn with hairlines and translucency, not drop shadows. Cards at rest use a 1px border
 or an inset ring; the ambient shadow is reserved for floating surfaces such as the navigation pill
 and sheets. Over photography, depth comes from a dark scrim plus backdrop blur (`glass-dark`).
+Its scrim is `rgb(14 14 13 / .62)`: white on it measures 5.4:1 even over a blown-out sky and
+6.8:1 over a mid-bright wall, so a HUD label survives arbitrary photography. The paper glass
+(`glass`) is a separate token and carries no scrim.
 
 ### Shadow Vocabulary
 - **Hairline ring** (`box-shadow: 0 0 0 1px var(--border)`): cards and grouped rows at rest.
@@ -245,7 +296,8 @@ same surface — that is the "AI card" tell.
 - Reserve brand green for moments that point at something: the logo, a numbered dot, a send arrow.
 - Use the HUD tokens for anything drawn over a photo, including the viewfinder.
 - Keep labels at 11.2px or larger (12px where space allows) and body text at 16px or larger.
-- Verify contrast before shipping: 4.5:1 for text, 3:1 for UI and focus rings.
+- Verify contrast before shipping: 4.5:1 for text, 3:1 for UI and focus rings. A brand fill
+  clears 3:1 against the page it sits on, in both themes.
 
 **Don't**
 - Don't reintroduce terracotta as the default; it is another brand's signature.
