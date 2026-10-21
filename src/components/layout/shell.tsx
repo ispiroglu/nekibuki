@@ -1,4 +1,11 @@
-import { Suspense, lazy, useCallback, useEffect } from 'react'
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  type ComponentType,
+  type LazyExoticComponent,
+} from 'react'
 import { CameraScreen } from '@/screens/camera-screen'
 import { PageDots } from '@/components/layout/page-dots'
 import { SwipeDeck } from '@/components/layout/swipe-deck'
@@ -8,10 +15,18 @@ import { useRepository } from '@/hooks/use-history'
 import { useAppStore } from '@/store/app'
 import { useLocationStore } from '@/store/location'
 
-const ProfileScreen = lazy(() =>
+/**
+ * The panels take an optional `active` flag: the panel in front keeps its `h1`,
+ * the ones off screen step down to `h2`, so the document has one title.
+ */
+type PanelProps = { active?: boolean }
+
+const ProfileScreen: LazyExoticComponent<ComponentType<PanelProps>> = lazy(() =>
   import('@/screens/profile-screen').then((module) => ({ default: module.ProfileScreen })),
 )
-const HistoryScreen = lazy(() =>
+const HistoryScreen: LazyExoticComponent<
+  ComponentType<PanelProps & { onOpenCamera: () => void }>
+> = lazy(() =>
   import('@/screens/history-screen').then((module) => ({ default: module.HistoryScreen })),
 )
 
@@ -36,6 +51,7 @@ export function Shell() {
   const screenIndex = useAppStore((state) => state.screenIndex)
   const setScreenIndex = useAppStore((state) => state.setScreenIndex)
   const setCapture = useAppStore((state) => state.setCapture)
+  const capture = useAppStore((state) => state.capture)
   const bumpHistory = useAppStore((state) => state.bumpHistory)
   const location = useLocationStore((state) => state.location)
   const locationStatus = useLocationStore((state) => state.status)
@@ -94,36 +110,46 @@ export function Shell() {
   }, [setScreenIndex])
 
   return (
-    <div className="relative h-dvh w-full overflow-hidden bg-background">
-      <SwipeDeck index={screenIndex} onIndexChange={setScreenIndex}>
-        <Suspense fallback={<PageSkeleton />}>
-          <ProfileScreen />
-        </Suspense>
-        <CameraScreen
-          active={screenIndex === 1}
-          onCapture={handleCapture}
-          location={location}
-          locationStatus={locationStatus}
-          onRequestLocation={requestLocation}
-          onClearLocation={() => useLocationStore.getState().reset()}
-          onOpenProfile={() => setScreenIndex(0)}
-          onOpenHistory={() => setScreenIndex(2)}
-        />
-        <Suspense fallback={<PageSkeleton />}>
-          <HistoryScreen onOpenCamera={() => setScreenIndex(1)} />
-        </Suspense>
-      </SwipeDeck>
+    <div
+      className="relative h-dvh w-full overflow-hidden bg-background"
+      // While a photo is being analysed the overlay is the only thing on
+      // screen: the deck behind it must not take focus.
+      inert={Boolean(capture)}
+    >
+      <main className="h-full w-full">
+        <SwipeDeck index={screenIndex} onIndexChange={setScreenIndex}>
+          <Suspense fallback={<PageSkeleton />}>
+            <ProfileScreen active={screenIndex === 0} />
+          </Suspense>
+          <CameraScreen
+            active={screenIndex === 1}
+            onCapture={handleCapture}
+            location={location}
+            locationStatus={locationStatus}
+            onRequestLocation={requestLocation}
+            onClearLocation={() => useLocationStore.getState().reset()}
+            onOpenProfile={() => setScreenIndex(0)}
+            onOpenHistory={() => setScreenIndex(2)}
+          />
+          <Suspense fallback={<PageSkeleton />}>
+            <HistoryScreen active={screenIndex === 2} onOpenCamera={() => setScreenIndex(1)} />
+          </Suspense>
+        </SwipeDeck>
+      </main>
 
       <SwipeHint />
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 flex justify-center pb-[max(0.6rem,env(safe-area-inset-bottom))]">
+      <nav
+        aria-label="Panels"
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-40 flex justify-center pb-[max(0.6rem,env(safe-area-inset-bottom))]"
+      >
         <PageDots
           index={screenIndex}
           onSelect={setScreenIndex}
           tone={screenIndex === 1 ? 'dark' : 'light'}
           className="pointer-events-auto"
         />
-      </div>
+      </nav>
     </div>
   )
 }

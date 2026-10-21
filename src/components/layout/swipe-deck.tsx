@@ -6,7 +6,7 @@ import {
   useTransform,
   type MotionValue,
 } from 'motion/react'
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
 /** Apple's momentum projection (Designing Fluid Interfaces). */
@@ -89,6 +89,7 @@ export function SwipeDeck({
   className?: string
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const hintId = useId()
   const x = useMotionValue(0)
   const reduceMotion = useReducedMotion()
   const [width, setWidth] = useState(0)
@@ -289,6 +290,7 @@ export function SwipeDeck({
       ref={containerRef}
       role="group"
       aria-label="Main screens"
+      aria-describedby={hintId}
       tabIndex={0}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -298,11 +300,17 @@ export function SwipeDeck({
       onKeyDown={onKeyDown}
       style={{ touchAction: 'pan-y' }}
       className={cn(
-        'relative h-full w-full overflow-hidden select-none focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring',
+        // The deck is full bleed, so the focus ring is drawn inside the frame:
+        // a brand-ink edge with a paper band under it stays visible over the
+        // camera as well as over the paper panels.
+        'relative h-full w-full overflow-hidden select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-ink focus-visible:shadow-[inset_0_0_0_4px_var(--background)]',
         dragging ? 'cursor-grabbing' : 'cursor-grab',
         className,
       )}
     >
+      <span id={hintId} className="sr-only">
+        Use the left and right arrow keys to change screen.
+      </span>
       <motion.div style={{ x, width: width * count }} className="flex h-full">
         {children.map((child, childIndex) => (
           <DeckPage

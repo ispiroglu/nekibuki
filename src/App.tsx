@@ -1,4 +1,4 @@
-import { Suspense, lazy } from 'react'
+import { Suspense, lazy, useEffect, useRef } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { BrowserRouter } from 'react-router-dom'
@@ -8,6 +8,7 @@ import { Shell } from '@/components/layout/shell'
 import { SplashScreen } from '@/components/layout/splash'
 import { AuthProvider, useAuth } from '@/lib/auth'
 import { AuthCallbackScreen } from '@/screens/auth-callback-screen'
+import { LegalScreen, type LegalPage } from '@/screens/legal-screen'
 import { LoginScreen } from '@/screens/login-screen'
 import { OnboardingScreen } from '@/screens/onboarding-screen'
 import { usePreferences } from '@/store/preferences'
@@ -16,12 +17,39 @@ const ReportScreen = lazy(() =>
   import('@/screens/report-screen').then((module) => ({ default: module.ReportScreen })),
 )
 
+/** The legal pages are readable by anyone, signed in or not. */
+function legalPage(pathname: string): LegalPage | null {
+  if (pathname === '/terms') return 'terms'
+  if (pathname === '/privacy') return 'privacy'
+  return null
+}
+
+function ReportRoute() {
+  const mainRef = useRef<HTMLElement>(null)
+
+  // The guide replaces the camera: put focus in the new page instead of
+  // leaving it on the control that was pressed.
+  useEffect(() => {
+    mainRef.current?.focus({ preventScroll: true })
+  }, [])
+
+  return (
+    <main ref={mainRef} tabIndex={-1} className="min-h-dvh bg-background focus:outline-none">
+      <Suspense fallback={<SplashScreen />}>
+        <ReportScreen />
+      </Suspense>
+    </main>
+  )
+}
+
 function Screens() {
   const { user, loading } = useAuth()
   const onboarded = usePreferences((state) => state.onboarded)
   const location = useLocation()
+  const legal = legalPage(location.pathname)
 
   if (location.pathname === '/auth/callback') return <AuthCallbackScreen />
+  if (legal) return <LegalScreen page={legal} />
   if (loading) return <SplashScreen />
   if (!user) return <LoginScreen />
   if (!onboarded[user.id]) return <OnboardingScreen />
@@ -31,14 +59,7 @@ function Screens() {
       <CaptureController />
       <Routes>
         <Route path="/" element={<Shell />} />
-        <Route
-          path="/report/:id"
-          element={
-            <Suspense fallback={<SplashScreen />}>
-              <ReportScreen />
-            </Suspense>
-          }
-        />
+        <Route path="/report/:id" element={<ReportRoute />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>

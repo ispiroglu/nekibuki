@@ -38,7 +38,9 @@ export const DialogContent = forwardRef<
     >
       {children}
       {!hideClose && (
-        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-secondary focus-visible:outline-none">
+        // 44×44 hit area (the icon keeps its place in the corner) and a real
+        // focus ring in the brand ink — the app's focus colour.
+        <DialogPrimitive.Close className="absolute right-2 top-2 grid size-11 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary focus-visible:ring-2 focus-visible:ring-brand-ink focus-visible:ring-offset-2 focus-visible:ring-offset-popover">
           <X className="size-4" />
           <span className="sr-only">Close</span>
         </DialogPrimitive.Close>
@@ -58,7 +60,8 @@ export const DialogTitle = forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Title
     ref={ref}
-    className={cn('font-serif text-xl font-medium tracking-[-0.01em]', className)}
+    // The close button sits in the corner: keep the title clear of it.
+    className={cn('pr-10 font-serif text-xl font-medium tracking-[-0.01em]', className)}
     {...props}
   />
 ))
