@@ -2,14 +2,26 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="light dark" />
     <script src="/theme-init.js"></script>
-    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f6f2e9" />
-    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#171512" />
+    <!--
+      Paper and dark paper from DESIGN.md. The pair follows the OS by default;
+      AppearanceSync silences both and pins one value when the traveller picks
+      light or dark in the app.
+    -->
+    <meta
+      name="theme-color"
+      media="(prefers-color-scheme: light)"
+      content="#faf9f5"
+      data-theme-color="light"
+    />
+    <meta
+      name="theme-color"
+      media="(prefers-color-scheme: dark)"
+      content="#1f1e1d"
+      data-theme-color="dark"
+    />
     <meta
       name="description"
       content="Nekibuki is a pocket guide for travellers: photograph a place and understand it."
@@ -21,7 +33,7 @@
     <meta name="format-detection" content="telephone=no" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" />
-    <link rel="mask-icon" href="/mask-icon.svg" color="#bd5b3d" />
+    <link rel="mask-icon" href="/mask-icon.svg" color="#0f5f57" />
     <title>Nekibuki — A guide in your pocket</title>
   </head>
   <body>

@@ -19,8 +19,8 @@ export default defineConfig({
         short_name: 'Nekibuki',
         description:
           'Point your camera at a place and understand it. Photo recognition and stories for travellers.',
-        theme_color: '#f6f2e9',
-        background_color: '#f6f2e9',
+        theme_color: '#faf9f5',
+        background_color: '#faf9f5',
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/',

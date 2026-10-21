@@ -3,11 +3,14 @@
  *
  * A preset only moves the hue: paper, serif, radii and layout stay put, so
  * variants can be compared fairly. Switch with `?brand=clay`, or leave it out
- * to keep the default petrol.
+ * to keep the documented default, petrol.
  */
 export const BRANDS = ['petrol', 'clay', 'okra', 'lapis', 'saffron'] as const
 
 export type Brand = (typeof BRANDS)[number]
+
+/** Petrol is the identity; the other presets are experiments. */
+export const DEFAULT_BRAND: Brand = 'petrol'
 
 const STORAGE_KEY = 'nekibuki.brand'
 
@@ -25,7 +28,7 @@ export function readBrand(): Brand | null {
 }
 
 export function applyBrand(brand: Brand) {
-  if (brand === 'petrol') {
+  if (brand === DEFAULT_BRAND) {
     delete document.documentElement.dataset.brand
   } else {
     document.documentElement.dataset.brand = brand
@@ -48,7 +51,7 @@ export function initBrand() {
 
   const stored = readBrand()
   if (stored) {
-    if (stored === 'petrol') delete document.documentElement.dataset.brand
+    if (stored === DEFAULT_BRAND) delete document.documentElement.dataset.brand
     else document.documentElement.dataset.brand = stored
   }
 }

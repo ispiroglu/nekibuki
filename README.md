@@ -125,7 +125,8 @@ a carousel library, so the animation stays interruptible mid-swipe.
 
 ## Tooling
 
-- `bun run icons` — regenerates the PWA icons in `public/` from the aperture mark drawn in code.
+- `bun run icons` — regenerates the PWA icons in `public/` from the aperture mark drawn in code
+  (`public/icon.svg`, `public/icon-maskable.svg`), using the paper, ink and petrol roles.
 - `bun run shots` — walks every screen with Playwright and writes screenshots to `SHOT_DIR`
   (needs a dev server on :5173).
 - `bun run brand:shots` — captures the same screens under every brand preset and writes a
@@ -137,8 +138,10 @@ The hue is a token, not a coat of paint. `src/index.css` gives it three roles:
 `--brand` (fills on paper), `--brand-ink` (text on paper) and `--hud` (marks over a photo),
 plus `--hud-fg` for the ink that sits on a HUD fill.
 
-The default is **petrol**. Presets live next to those tokens (`petrol`, `clay`, `okra`, `lapis`,
-`saffron`). Compare them without touching code:
+The default is **petrol** — the documented identity, and what the installed app, manifest,
+browser chrome and icons use. Presets live next to those tokens (`petrol`, `clay`, `okra`,
+`lapis`, `saffron`); `clay` is the opt-in terracotta experiment and never the default. Compare
+them without touching code:
 
 ```bash
 bun run dev:web
@@ -147,7 +150,7 @@ open 'http://localhost:5173/?brandlab=1'     # floating switcher, dev only
 ```
 
 The choice is persisted in `localStorage`; omit the parameter (or use `?brand=petrol`) to return
-to the default.
+to the default. The floating switcher is compiled out of production builds.
 
 ## Design context
 
