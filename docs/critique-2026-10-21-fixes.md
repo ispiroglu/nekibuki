@@ -9,7 +9,9 @@ change was verified.
 - **Branch:** `impeccable/critique-fixes` (from `impeccable/critique` @ `98acde6`, itself from `impeccable/integration` @ `a9952f7`)
 - **Merge:** `cbe655b` (six worker branches, file-disjoint, no conflicts)
 - **Integration fixes by the coordinator:** `eefbe33` (camera "Places" shortcut name + smoke selector), `be955c1` (the visible settings trigger retires the long-press hint; swipe hint no longer covers the caption or the shelf)
-- **Deployed:** Cloudflare Worker `nekibuki` → `nekibuki.thecrafter.io`, version `4024cba9-a8ca-4ee3-a06b-a17c1c05c2ac`
+- **Deployed:** Cloudflare Worker `nekibuki` → `nekibuki.thecrafter.io`, version `b7de7579-9edd-4d39-af7e-0cf411626849` (deployed from `master` after the branch was promoted)
+- **Promoted:** `master` fast-forwarded to this branch and pushed to `origin/master` (`49a511c..636e618`)
+- **Preserved:** the uncommitted work that was sitting in the `pwa` worktree is snapshotted as `wip/pwa-2026-10-21` (`8d7e48c`); that working tree was not touched
 - **Verification:** `bun run typecheck` ✅ · `bun run build:only` ✅ · `bun run smoke` 12/12 against dev **and** against production ✅ · 16 coordinator checks against the live site ✅ · 0 console errors
 
 ## How the work was split
