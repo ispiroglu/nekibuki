@@ -35,10 +35,6 @@
   --brand-fg: #f2fbf8;
   --hud: #6cc0b0;
   --hud-fg: #141413;
-  /* Compatibility aliases: older components still speak in "clay". */
-  --clay: var(--brand);
-  --clay-ink: var(--brand-ink);
-  --clay-foreground: var(--brand-fg);
   --destructive: #c4472f;
   --destructive-foreground: #faf9f5;
   --border: #e8e6dc;
@@ -77,10 +73,12 @@
 }
 
 /*
- * Brand presets for the token lab.
+ * Brand presets for the colour lab.
  * Switch with ?brand=<name> (persisted) or by setting data-brand on <html>.
  * Each preset keeps the paper, the serif and the radii; only the hue moves.
- * Petrol is the default, so it needs no attribute.
+ * Petrol is the default (the documented identity); clay is the opt-in
+ * terracotta experiment. Every preset still needs all four roles, so a
+ * component never has to know which hue is active.
  */
 [data-brand='clay'] {
   --brand: #d97757;
@@ -158,9 +156,6 @@
   --color-brand-fg: var(--brand-fg);
   --color-hud: var(--hud);
   --color-hud-fg: var(--hud-fg);
-  --color-clay: var(--clay);
-  --color-clay-ink: var(--clay-ink);
-  --color-clay-foreground: var(--clay-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);

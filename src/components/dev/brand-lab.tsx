@@ -1,25 +1,22 @@
 import { useState } from 'react'
-import { BRANDS, applyBrand, isBrand, type Brand } from '@/lib/brand'
+import { BRANDS, DEFAULT_BRAND, applyBrand, isBrand, type Brand } from '@/lib/brand'
 
-const SWATCH: Record<Brand, string> = {
-  petrol: '#0f5f57',
-  clay: '#d97757',
-  okra: '#9c6116',
-  lapis: '#2a4c8f',
-  saffron: '#c98a1c',
+const LABELS: Record<Brand, string> = {
+  petrol: 'Petrol (default)',
+  clay: 'Clay (experiment)',
+  okra: 'Okra',
+  lapis: 'Lapis',
+  saffron: 'Saffron',
 }
 
-/**
- * Dev-only palette switcher. Mount it with `?brandlab=1` so it never shows up in
- * screenshots or a normal run.
- */
-export function BrandLab() {
-  const [active, setActive] = useState<Brand>(() => {
-    const current = new URLSearchParams(window.location.search).get('brand')
-    return isBrand(current) ? current : 'petrol'
-  })
+function activeBrand(): Brand {
+  const applied = document.documentElement.dataset.brand ?? null
+  return isBrand(applied) ? applied : DEFAULT_BRAND
+}
 
-  if (!import.meta.env.DEV) return null
+function BrandLabSwitcher() {
+  const [active, setActive] = useState<Brand>(activeBrand)
+
   if (!new URLSearchParams(window.location.search).has('brandlab')) return null
 
   return (
@@ -28,18 +25,28 @@ export function BrandLab() {
         <button
           key={brand}
           type="button"
+          // Each swatch carries the preset's own data-brand, so its fill comes
+          // from that preset's --brand token instead of a hardcoded hex.
+          data-brand={brand}
           onClick={() => {
             applyBrand(brand)
             setActive(brand)
           }}
-          title={brand}
-          aria-label={brand}
+          title={LABELS[brand]}
+          aria-label={LABELS[brand]}
           aria-pressed={active === brand}
           className="size-7 rounded-full ring-2 ring-transparent transition-transform active:scale-90 data-[active=true]:ring-white"
           data-active={active === brand}
-          style={{ backgroundColor: SWATCH[brand] }}
+          style={{ backgroundColor: 'var(--brand)' }}
         />
       ))}
     </div>
   )
 }
+
+/**
+ * Dev-only palette switcher. Mount it with `?brandlab=1` so it never shows up in
+ * screenshots or a normal run. The export collapses to a no-op outside dev, so
+ * the switcher and its preset labels are tree-shaken out of production builds.
+ */
+export const BrandLab = import.meta.env.DEV ? BrandLabSwitcher : () => null

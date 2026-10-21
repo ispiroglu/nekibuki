@@ -1,7 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <rect width="1024" height="1024" rx="232" fill="#f6f2e9" />
+  <!-- Paper ground, ink aperture ring, petrol core (DESIGN.md colours). -->
+  <rect width="1024" height="1024" rx="232" fill="#faf9f5" />
   <g transform="translate(512 512) scale(24) translate(-16 -16)">
-    <g stroke="#bd5b3d" stroke-width="2.6" stroke-linecap="round" fill="none">
+    <g stroke="#141413" stroke-width="2.6" stroke-linecap="round" fill="none">
       <path d="M16 4A12 12 0 0 1 23.71 6.81" />
       <path d="M16 4A12 12 0 0 1 23.71 6.81" transform="rotate(60 16 16)" />
       <path d="M16 4A12 12 0 0 1 23.71 6.81" transform="rotate(120 16 16)" />
@@ -9,6 +10,6 @@
       <path d="M16 4A12 12 0 0 1 23.71 6.81" transform="rotate(240 16 16)" />
       <path d="M16 4A12 12 0 0 1 23.71 6.81" transform="rotate(300 16 16)" />
     </g>
-    <circle cx="16" cy="16" r="3.4" fill="#201d18" />
+    <circle cx="16" cy="16" r="3.4" fill="#0f5f57" />
   </g>
 </svg>
