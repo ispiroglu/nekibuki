@@ -54,6 +54,8 @@ export function CaptureController() {
           language,
           token: accessToken,
           signal: controller.signal,
+          // Only set when the photo answers a suggested step.
+          continuation: draft.continuation,
         })
         if (!active) return
 

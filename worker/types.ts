@@ -6,11 +6,23 @@ export type AppEnv = Env & {
   SUPABASE_ANON_KEY?: string
 }
 
+/**
+ * The frame the traveller was sent to take, when the guide is asking for a
+ * second shot. It is what turns one analysis into a walk.
+ */
+export interface VisionContinuation {
+  placeTitle: string
+  placeName: string
+  /** The shot the traveller was asked to take, in their words. */
+  instruction: string
+}
+
 export interface VisionInput {
   image: ArrayBuffer
   mimeType: string
   location?: { latitude: number; longitude: number; accuracy?: number }
   language: GuideLanguage
+  continuation?: VisionContinuation
 }
 
 export interface VisionProvider {

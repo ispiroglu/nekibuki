@@ -105,6 +105,46 @@ export const MOCK_REPORTS: MockReport[] = [
           seeInPhoto: 'The merging legs, the arch band and the decks stacked above.',
         },
       ],
+      oddities: [
+        {
+          id: 'eiffel-odd-1',
+          title: 'The restaurant that left Paris',
+          body: 'A restaurant sat near the top of the tower from 1937 to 1981. Engineers decided it was too heavy and made the summit sag, so it was sold, carried across the Atlantic and rebuilt on the edge of the French Quarter in New Orleans.',
+        },
+        {
+          id: 'eiffel-odd-2',
+          title: 'A cannon fired from the summit',
+          body: 'For the 1889 fair, the daily opening and the daily closing of the exposition were announced by a cannon fired from the top of the tower.',
+        },
+        {
+          id: 'eiffel-odd-3',
+          title: 'The apartment the engineer never slept in',
+          body: 'Gustave Eiffel had a private apartment fitted out on the top level, with furniture made by Jean Lachaise. The tower’s own history says he presumably never slept there; Thomas Edison did visit him in it in September 1889, and signed the guestbook.',
+        },
+      ],
+      nextSteps: [
+        {
+          id: 'eiffel-step-1',
+          label: 'Step back',
+          title: 'The four legs and the arch band',
+          instruction: 'Stand in the middle of the road opposite the tower and shoot so the whole arch and the four legs fit in the frame.',
+          why: 'Only from the middle of the street do the legs separate, and the tower reads as four arches instead of one mass.',
+        },
+        {
+          id: 'eiffel-step-2',
+          label: 'Look up',
+          title: 'The lattice overhead',
+          instruction: 'Stand under one of the pillars, tilt the phone straight up and shoot so the ironwork closes over the frame.',
+          why: 'From directly underneath the lattice becomes a pattern, and the sky comes through every rivet.',
+        },
+        {
+          id: 'eiffel-step-3',
+          label: 'Turn around',
+          title: 'The tower in the Seine',
+          instruction: 'Turn your back on the tower, walk to the parapet by the water and shoot back with the reflection in the lower half of the frame.',
+          why: 'The tower was put on the riverbank so that fair visitors crossing the Seine saw it; the reflection frames it the way they did.',
+        },
+      ],
       suggestedQuestions: [
         'Why was it almost demolished?',
         'How was it built so quickly?',
@@ -210,6 +250,46 @@ export const MOCK_REPORTS: MockReport[] = [
           seeInPhoto: 'The contrast between the ruined left rim and the smooth right buttress.',
         },
       ],
+      oddities: [
+        {
+          id: 'col-odd-1',
+          title: 'The emperor who fought in his own arena',
+          body: 'Commodus fought in the Colosseum himself, taking the part of the secutor, with shield and wooden sword. Cassius Dio, sitting in the audience, wrote that the emperor cut off an ostrich’s head and carried it to the senators’ seats with a bloody sword, wagging his head at them. The senators bit leaves from their garlands to keep from laughing; laughing would have been fatal.',
+        },
+        {
+          id: 'col-odd-2',
+          title: 'Men dressed as giants with serpents for legs',
+          body: 'The sources say Commodus had the men who had lost their feet gathered up and dressed as giants, with wrappings for serpents’ bodies bound to their legs, then killed them with a club in the arena, staging the fight of Hercules against the giants.',
+        },
+        {
+          id: 'col-odd-3',
+          title: 'His own head on the colossal statue',
+          body: 'Dio records that Commodus cut the head off the colossal statue that stood near the amphitheatre and put a likeness of his own in its place, with a club and a bronze lion at its feet, so that it looked like Hercules. He also renamed Rome itself Commodiana.',
+        },
+      ],
+      nextSteps: [
+        {
+          id: 'col-step-1',
+          label: 'Go under',
+          title: 'The arches of the outer ring',
+          instruction: 'Walk under the first tier of arches and shoot upward so that a single arch frames the sky.',
+          why: 'Those arcades were the numbered entrances; standing under one shows the scale of the crowd that moved through it.',
+        },
+        {
+          id: 'col-step-2',
+          label: 'Look closer',
+          title: 'The holes in the travertine',
+          instruction: 'Move in close to the sunlit outer wall and fill the frame with a metre of stone so that the holes are clearly visible.',
+          why: 'Each hole is an iron clamp that medieval builders cut out to reuse the metal; the wall is a record of the quarrying.',
+        },
+        {
+          id: 'col-step-3',
+          label: 'Look down',
+          title: 'The backstage under the sand',
+          instruction: 'Stand at the rail on the far side of the road and shoot down into the arena so that the walls of the hypogeum fill the lower half of the frame.',
+          why: 'The service floor under the sand is the part of the building that most people never see from the street.',
+        },
+      ],
       suggestedQuestions: [
         'Could they really flood the arena?',
         'How did 50,000 people get out?',
@@ -313,6 +393,46 @@ export const MOCK_REPORTS: MockReport[] = [
           title: 'Why the silhouette is so busy',
           body: 'A single dome can look heavy. By surrounding it with half-domes and topping the corners with small cupolas, the architect turned the roof into a gradual staircase. The six minarets add vertical lines that balance the horizontal spread. From this angle, the building looks less like one dome and more like a small mountain range.',
           seeInPhoto: 'The stepped roofline and the six vertical minarets.',
+        },
+      ],
+      oddities: [
+        {
+          id: 'blue-odd-1',
+          title: 'The chain that made the sultan bow',
+          body: 'A heavy iron chain hangs across the entrance from the Hippodrome. Only the sultan was allowed to ride into the courtyard, and the chain is hung so that he has to lower his head every single time he enters — a gesture to keep the ruler humble before the divine.',
+        },
+        {
+          id: 'blue-odd-2',
+          title: 'Ostrich eggs in the chandeliers',
+          body: 'Ostrich eggs were hung among the crystals of the great lamps inside the mosque. In Istanbul they are still explained as a warning of earthquakes — or, in the older account, as a way of keeping the spiders out of the lamp.',
+        },
+        {
+          id: 'blue-odd-3',
+          title: 'The sultan died before the mosque was finished',
+          body: 'Ahmed I died in 1617 while the work was still going on; the last accounts for the construction are signed by his successor, Mustafa I. His mausoleum was raised in 1619 beside the courtyard, and he and four of his sons lie under its dome.',
+        },
+      ],
+      nextSteps: [
+        {
+          id: 'blue-step-1',
+          label: 'Step back',
+          title: 'The whole silhouette',
+          instruction: 'Stand just inside the courtyard gate and shoot wide so that the main dome sits in the centre with the minarets around it.',
+          why: 'The cascade of half-domes reads as one building only from this distance; closer up, the roof looks like separate parts.',
+        },
+        {
+          id: 'blue-step-2',
+          label: 'Look up',
+          title: 'The small domes of the arcade',
+          instruction: 'Walk along the arcade beside the courtyard and tilt the phone up so that the row of small domes recedes into the distance.',
+          why: 'The portico domes are a miniature of the main cascade; from below they read as a building of their own.',
+        },
+        {
+          id: 'blue-step-3',
+          label: 'Turn around',
+          title: 'Hagia Sophia behind',
+          instruction: 'Turn around, cross to the far side of the square and shoot back so that the older dome stands behind the minarets.',
+          why: 'Ahmed I built here to be compared with the Byzantine dome across the way; one frame holds both.',
         },
       ],
       suggestedQuestions: [

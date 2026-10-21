@@ -9,20 +9,25 @@ export function SwipeHint() {
   const markSeen = usePreferences((state) => state.markSwipeHintSeen)
   const screenIndex = useAppStore((state) => state.screenIndex)
   const settingsOpen = useAppStore((state) => state.viewfinderSettingsOpen)
+  const pendingStep = useAppStore((state) => state.pendingStep)
   const [visible, setVisible] = useState(!seen)
 
+  // The hint sits in the same band as the viewfinder settings shelf and the
+  // shot the guide proposed; it steps aside while either of them is open so
+  // the two never stack.
+  const show = visible && screenIndex === 1 && !settingsOpen && !pendingStep
+
   useEffect(() => {
-    if (!visible) return
+    // The clock starts when the hint is actually on screen. A hint that was
+    // stepped aside for six seconds has not been read, so it must not expire
+    // unseen.
+    if (!show) return
     const timer = window.setTimeout(() => {
       setVisible(false)
       markSeen()
     }, 6000)
     return () => window.clearTimeout(timer)
-  }, [visible, markSeen])
-
-  // The hint sits in the same band as the viewfinder settings shelf; it steps
-  // aside while the shelf is open so the two never stack.
-  const show = visible && screenIndex === 1 && !settingsOpen
+  }, [show, markSeen])
 
   return (
     <AnimatePresence>

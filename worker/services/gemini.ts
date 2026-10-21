@@ -87,11 +87,39 @@ const responseSchema = {
         required: ['id', 'title', 'body'],
       },
     },
+    oddities: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          id: { type: 'STRING' },
+          title: { type: 'STRING' },
+          body: { type: 'STRING' },
+        },
+        required: ['id', 'title', 'body'],
+      },
+    },
+    nextSteps: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          id: { type: 'STRING' },
+          label: { type: 'STRING' },
+          title: { type: 'STRING' },
+          instruction: { type: 'STRING' },
+          why: { type: 'STRING' },
+        },
+        required: ['id', 'label', 'title', 'instruction', 'why'],
+      },
+    },
     suggestedQuestions: {
       type: 'ARRAY',
       items: { type: 'STRING' },
     },
   },
+  // oddities and nextSteps stay out of "required": a provider that skips them
+  // must not fail the whole report, and the zod schema treats both as optional.
   required: [
     'title',
     'kind',
@@ -200,7 +228,7 @@ export class GeminiProvider implements VisionProvider {
   }
 
   async analyze(input: VisionInput): Promise<AttractionReport> {
-    const prompt = buildAnalyzePrompt(input.language, input.location)
+    const prompt = buildAnalyzePrompt(input.language, input.location, input.continuation)
 
     const payload = await this.call({
       systemInstruction: {
@@ -222,7 +250,9 @@ export class GeminiProvider implements VisionProvider {
       generationConfig: {
         temperature: 0.45,
         topP: 0.9,
-        maxOutputTokens: 4096,
+        // The report grew by two blocks of prose (oddities, nextSteps). At
+        // 4096 a full report could be cut off mid-JSON, which fails the parse.
+        maxOutputTokens: 5120,
         responseMimeType: 'application/json',
         responseSchema,
       },

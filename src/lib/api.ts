@@ -7,6 +7,7 @@ import type {
   GeoPoint,
   GuideLanguage,
 } from '@shared/types'
+import type { CaptureContinuation } from '@/store/app'
 import { sleep } from './utils'
 
 const MOCK_FALLBACK = import.meta.env.VITE_MOCK_ANALYSIS === 'true'
@@ -58,12 +59,17 @@ export async function analyzePhoto(options: {
   language: GuideLanguage
   token: string | null
   signal?: AbortSignal
+  /** The shot the guide asked for, when this photo answers it. */
+  continuation?: CaptureContinuation
 }): Promise<AnalyzeResponse> {
-  const { image, location, language, token, signal } = options
+  const { image, location, language, token, signal, continuation } = options
   const form = new FormData()
   form.append('image', image, 'capture.jpg')
   if (location) form.append('location', JSON.stringify(location))
   form.append('language', language)
+  // Three strings about the walk so far. They travel with the photo, never
+  // with the request body: the endpoint already reads multipart.
+  if (continuation) form.append('continuation', JSON.stringify(continuation))
 
   try {
     const response = await fetch('/api/analyze', {

@@ -1,5 +1,12 @@
 import type { GeoPoint } from '@shared/types'
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import {
+  AnimatePresence,
+  animate,
+  motion,
+  useMotionValue,
+  useReducedMotion,
+  useTransform,
+} from 'motion/react'
 import {
   Bookmark,
   Camera as CameraIcon,
@@ -26,6 +33,13 @@ import { useAppStore } from '@/store/app'
 import { usePreferences } from '@/store/preferences'
 
 type CameraStatus = 'idle' | 'starting' | 'ready' | 'denied' | 'error'
+
+/**
+ * The viewfinder opens in two beats. `warming` is the small window waiting
+ * for the stream, `opening` is the pull to the edges of the frame, and
+ * `locked` is the settled picture the chrome is allowed to sit on.
+ */
+type ViewPhase = 'warming' | 'opening' | 'locked'
 
 interface ZoomCapability {
   min: number
@@ -56,7 +70,7 @@ function applyAdvanced(track: MediaStreamTrack, constraint: AdvancedConstraint) 
 /**
  * Whether a tap can actually move focus. `getCapabilities()` is the honest signal:
  * iOS Safari exposes no `focusMode`, so tap-to-focus is a no-op there and we must
- * not draw the brand focus ring.
+ * not draw the focus reticle.
  */
 function focusSupport(track: MediaStreamTrack): 'supported' | 'unsupported' | 'unknown' {
   if (typeof track.getCapabilities !== 'function') return 'unknown'
@@ -79,14 +93,24 @@ function focusSupport(track: MediaStreamTrack): 'supported' | 'unsupported' | 'u
  */
 const hudEdge = 'ring-1 ring-black/35'
 
+/**
+ * A mark drawn over a photograph needs an edge of its own, or it dissolves
+ * into a blown-out sky. The chrome gets that edge from a ring; a stroked mark
+ * gets it from a hairline traced along the stroke, which is the same
+ * separation the report's photo markers use.
+ */
+const markSeparation = 'drop-shadow(0 0 1px rgb(0 0 0 / 0.7)) drop-shadow(0 1px 2px rgb(0 0 0 / 0.4))'
+
 const captureFailedMessage = "Couldn't grab that frame — try again."
 
 /** Long enough to be deliberate, short enough not to feel stuck. */
 const longPressMs = 420
 
 /**
- * The four corners of the framing guide. Each one is a thin HUD-mint arm; the
- * guide carries a soft dark separation so the mark survives a bright sky.
+ * The four corners of a mark: thin HUD-mint arms with square ends. The same
+ * arms draw the framing guide and the focus reticle, so the viewfinder speaks
+ * one shape language; the separation that keeps them readable over a bright
+ * sky is traced along them where they are drawn.
  */
 const guideCorners = [
   { position: 'left-0 top-0', edges: 'border-l-[2px] border-t-[2px]' },
@@ -94,6 +118,21 @@ const guideCorners = [
   { position: 'bottom-0 left-0', edges: 'border-b-[2px] border-l-[2px]' },
   { position: 'bottom-0 right-0', edges: 'border-b-[2px] border-r-[2px]' },
 ]
+
+/**
+ * The viewfinder is a window that opens. The picture stays at full size under
+ * a black mat; the hole in the mat is the aperture, and it grows to the edges
+ * of the frame once the stream is ready. Because the picture never changes
+ * size, the frame opens without the picture jumping to a new framing.
+ *
+ * Everything is one scale of that hole, so the aperture is described by
+ * numbers rather than by animating layout.
+ */
+const apertureArrival = 0.46 // the scale the window arrives at
+const apertureRest = 0.54 // the scale it rests at while the stream warms
+const apertureOpen = 1.87 // the scale that fills the frame
+const apertureRadius = 56 // local px; 56 × 0.54 ≈ 30px on screen
+const apertureEdge = 0.16 // the hairline around the open window
 
 export function CameraScreen({
   active,
@@ -147,6 +186,12 @@ export function CameraScreen({
   const [grid, setGrid] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const setViewfinderSettingsOpen = useAppStore((state) => state.setViewfinderSettingsOpen)
+  // The shot the guide proposed. While it waits, the camera says what it is
+  // looking for instead of its own generic line.
+  const pendingStep = useAppStore((state) => state.pendingStep)
+  const setPendingStep = useAppStore((state) => state.setPendingStep)
+  // What the camera is being asked to find, said once for a screen reader.
+  const [announcement, setAnnouncement] = useState('')
   const [zoomNotice, setZoomNotice] = useState(0)
   const [helpOpen, setHelpOpen] = useState(false)
   const [flash, setFlash] = useState(false)
@@ -155,29 +200,94 @@ export function CameraScreen({
   const [locationMenuOpen, setLocationMenuOpen] = useState(false)
   const [capturing, setCapturing] = useState(false)
   const [cameraPermission, setCameraPermission] = useState<PermissionState>('prompt')
-  // A short beat between "stream is live" and "window pulls open" so the card
-  // reads as a deliberate frame instead of a one-frame glitch.
-  const [revealed, setRevealed] = useState(false)
+  // Where the viewfinder is in its two-beat opening. The chrome waits for
+  // `locked`: a control that fades in over a moving edge is a control the
+  // traveller cannot aim at.
+  const [phase, setPhase] = useState<ViewPhase>('warming')
+  // The opening is a single number so the pull can be interrupted and resumed
+  // without the window ever being laid out twice.
+  const openProgress = useMotionValue(0)
+  const openControls = useRef<ReturnType<typeof animate> | null>(null)
   // The hint is a first-open affordance: switching lenses reuses the pull but
   // should not repeat the copy.
   const hasRevealed = useRef(false)
+  // The brand pulse plays once, the first time the frame locks.
+  const [pulseId, setPulseId] = useState(0)
+
+  // The mat's hole: the window grows in two steps, a small arrival and then
+  // the pull to the edges of the frame.
+  const apertureScale = useTransform(openProgress, (progress) =>
+    progress <= 0.5
+      ? apertureArrival + (apertureRest - apertureArrival) * (progress / 0.5)
+      : apertureRest + (apertureOpen - apertureRest) * ((progress - 0.5) / 0.5),
+  )
+  // The corner radius unwinds to nothing as the window reaches the edges.
+  const apertureCorner = useTransform(openProgress, (progress) =>
+    progress <= 0.5
+      ? `${apertureRadius}px`
+      : `${apertureRadius * (1 - (progress - 0.5) / 0.5)}px`,
+  )
+  // The hairline fades in with the arrival and dissolves with the pull, so the
+  // frame ends on the picture rather than on a drawn edge.
+  const apertureShadow = useTransform(openProgress, (progress) => {
+    const arrival = clamp(progress / 0.25, 0, 1)
+    const pull = progress <= 0.5 ? 0 : (progress - 0.5) / 0.5
+    const alpha = apertureEdge * arrival * (1 - pull)
+    return `0 0 0 3000px #000, 0 0 0 2px rgb(255 255 255 / ${alpha.toFixed(3)})`
+  })
+  // The picture comes up with the window instead of appearing all at once.
+  const sceneOpacity = useTransform(openProgress, (progress) => clamp(progress / 0.25, 0, 1))
 
   useEffect(() => {
+    const stop = () => {
+      openControls.current?.stop()
+      openControls.current = null
+    }
+
     if (!active) {
+      stop()
+      setPhase('warming')
+      openProgress.set(0)
       hasRevealed.current = false
-      setRevealed(false)
       return
     }
+
     if (status !== 'ready') {
-      setRevealed(false)
-      return
+      // Beat one: the lens opens on a small window while the stream warms.
+      stop()
+      setPhase('warming')
+      const controls = animate(
+        openProgress,
+        0.5,
+        reduceMotion ? { duration: 0 } : { duration: 0.45, ease: [0.16, 1, 0.3, 1] },
+      )
+      openControls.current = controls
+      return () => controls.stop()
     }
+
+    // Beat two: the window pulls open to the edges of the frame and settles.
+    // The beat lets the first-run copy leave the picture before anything
+    // moves under it.
+    stop()
     const timer = window.setTimeout(() => {
-      hasRevealed.current = true
-      setRevealed(true)
-    }, reduceMotion ? 0 : 260)
+      setPhase('opening')
+      const controls = animate(
+        openProgress,
+        1,
+        reduceMotion ? { duration: 0 } : { type: 'spring', bounce: 0, duration: 0.6 },
+      )
+      openControls.current = controls
+      void controls.then(() => {
+        if (openControls.current !== controls) return
+        setPhase('locked')
+        if (!hasRevealed.current) {
+          hasRevealed.current = true
+          setPulseId((value) => value + 1)
+        }
+      })
+    }, reduceMotion ? 0 : 280)
     return () => window.clearTimeout(timer)
-  }, [active, status, reduceMotion])
+  }, [active, status, reduceMotion, openProgress])
 
   useEffect(() => {
     if (!active) {
@@ -380,6 +490,36 @@ export function CameraScreen({
     void applyAdvanced(track, { torch: next })
   }, [torch, hapticsEnabled])
 
+  /**
+   * The suggested step has been answered, so it must not answer the next
+   * photo as well. The capture reads it first and hands it to the analysis,
+   * and only then does it leave the store.
+   */
+  const consumePendingStep = useCallback(() => {
+    if (useAppStore.getState().pendingStep) setPendingStep(null)
+  }, [setPendingStep])
+
+  const dismissPendingStep = useCallback(() => {
+    setPendingStep(null)
+    haptic('light', hapticsEnabled)
+  }, [hapticsEnabled, setPendingStep])
+
+  /**
+   * A live region only speaks when its text changes, so the step is spoken a
+   * frame after the camera mounts with it. Without the delay the words would
+   * be in the region before any screen reader was listening.
+   */
+  useEffect(() => {
+    if (!active || !pendingStep) {
+      setAnnouncement('')
+      return
+    }
+    const frame = window.requestAnimationFrame(() => {
+      setAnnouncement(`Next shot: ${pendingStep.title}. ${pendingStep.instruction}`)
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [active, pendingStep])
+
   const handleShutter = useCallback(async () => {
     if (capturingRef.current) return
     const video = videoRef.current
@@ -397,17 +537,20 @@ export function CameraScreen({
       setFlash(true)
       window.setTimeout(() => setFlash(false), 190)
       onCapture(blob)
+      consumePendingStep()
     } catch {
       toast.error(captureFailedMessage)
     } finally {
       capturingRef.current = false
       setCapturing(false)
     }
-  }, [hapticsEnabled, onCapture, status])
+  }, [consumePendingStep, hapticsEnabled, onCapture, status])
 
   const handlePreviewTap = useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {
-      if (!revealed) return
+      // The picture has to be settled before a tap can mean anything: the
+      // focus reticle is drawn on the frame the traveller actually sees.
+      if (phase !== 'locked') return
       // A long press opens the settings shelf; the click that follows it must not
       // also move focus.
       if (suppressTap.current) {
@@ -462,11 +605,11 @@ export function CameraScreen({
         .then(showRing)
         .catch(() => undefined)
     },
-    [facing, hapticsEnabled, revealed],
+    [facing, hapticsEnabled, phase],
   )
 
   const handlePreviewPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!revealed) return
+    if (phase !== 'locked') return
     if (event.pointerType === 'mouse' && event.button !== 0) return
     suppressTap.current = false
     clearLongPress()
@@ -611,95 +754,102 @@ export function CameraScreen({
       {active && <h1 className="sr-only">Camera</h1>}
 
       {/*
-        The viewfinder starts as a small, soft-edged window and pulls open to
-        full bleed the moment the stream is ready. Same geometry as the tap
-        mapping below, which assumes a full-screen preview once ready.
+        The step arrives without anyone touching the camera, so it is
+        announced rather than waited for: a screen reader hears what the
+        camera is being asked to find.
       */}
-      <motion.div
-        initial={false}
-        animate={
-          revealed
-            ? {
-                width: '100%',
-                height: '100%',
-                borderRadius: 0,
-                boxShadow:
-                  '0 0 0 0 rgba(255,255,255,0), 0 24px 50px -20px rgba(0,0,0,0)',
-              }
-            : {
-                width: '54%',
-                height: '62%',
-                borderRadius: 30,
-                boxShadow:
-                  '0 0 0 1px rgba(255,255,255,0.14), 0 24px 50px -20px rgba(0,0,0,0.75)',
-              }
-        }
-        transition={
-          reduceMotion
-            ? { duration: 0.2, ease: 'easeOut' }
-            : { type: 'spring', bounce: 0.06, duration: 0.8 }
-        }
-        className="absolute inset-0 m-auto overflow-hidden bg-black"
-      >
-        <video
+      <span className="sr-only" role="status" aria-live="polite">
+        {announcement}
+      </span>
+
+      {/*
+        The viewfinder is a window that opens. The picture lies at full size
+        under a black mat; the hole in the mat is the aperture, and it grows to
+        the edges of the frame once the stream is ready. The picture itself
+        never changes size, so the frame opens without the picture jumping to
+        a different framing — the same geometry the tap mapping below assumes.
+      */}
+      <motion.div className="absolute inset-0" style={{ opacity: sceneOpacity }}>
+        <motion.video
           ref={videoRef}
           playsInline
           muted
           autoPlay
+          initial={false}
+          animate={{ opacity: phase === 'warming' ? 0 : 1 }}
+          transition={{ duration: reduceMotion ? 0 : 0.5, ease: 'easeOut' }}
           className={cn(
             'absolute inset-0 size-full object-cover',
-            'transition-[opacity,filter] duration-700 ease-out',
             facing === 'user' && '-scale-x-100',
-            status === 'ready' ? 'opacity-100' : 'opacity-0',
-            // The soft focus belongs to the small window the stream opens in.
-            // Once the window is open the filter is removed outright: a live
-            // video layer with a filter on it pays for a full-screen filter
-            // pass on every single frame, for a blur that no longer shows.
-            status === 'ready' && !revealed ? 'blur-[14px]' : '',
           )}
         />
 
+        {/*
+          The last painted frame is held until the live picture has taken
+          over, so leaving and re-entering the camera never drops back to a
+          black frame while the new stream warms.
+        */}
         {stillUrl && (
           <motion.img
             src={stillUrl}
             alt=""
             aria-hidden
             initial={false}
-            animate={{ opacity: revealed ? 0 : 1 }}
-            transition={reduceMotion ? { duration: 0 } : { duration: 0.45, ease: 'easeOut' }}
+            animate={{ opacity: phase === 'warming' ? 1 : 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.45, ease: 'easeOut' }}
             className={cn(
               'pointer-events-none absolute inset-0 size-full object-cover',
-              'transition-[filter] duration-700 ease-out',
-              !revealed && 'blur-[4px]',
+              'transition-[filter] duration-300 ease-out',
+              phase === 'warming' && 'blur-[4px]',
             )}
           />
         )}
 
+        {/*
+          The brand mark belongs to the opening beat. It leaves the picture
+          before the window starts to move, and it does not come back when the
+          traveller switches lenses.
+        */}
         <AnimatePresence>
-          {!revealed && (
+          {status !== 'ready' && !hasRevealed.current && (
             <motion.span
               key="intro-mark"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
+              transition={{ duration: 0.22 }}
               className="pointer-events-none absolute inset-0 grid place-items-center"
             >
               <Logo className="size-8 animate-breathe text-white/40" />
             </motion.span>
           )}
         </AnimatePresence>
+      </motion.div>
 
-        {/* One brand pulse at the moment the window locks to full screen. */}
+      {/*
+        The mat. Its hole is the window the traveller looks through, and the
+        hairline around that hole is the only edge the frame has while it is
+        still small. The hairline dissolves with the pull, so the opening ends
+        on the picture rather than on a drawn line.
+      */}
+      <motion.span
+        aria-hidden
+        className="pointer-events-none absolute left-[23%] top-[23%] h-[54%] w-[54%]"
+        style={{ scale: apertureScale, borderRadius: apertureCorner, boxShadow: apertureShadow }}
+      />
+
+      {/* One brand pulse, the first time the window locks to the full frame. */}
+      {pulseId > 0 && (
         <motion.span
+          key={pulseId}
           aria-hidden
-          initial={false}
-          animate={revealed ? { opacity: [0, 0.9, 0] } : { opacity: 0 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: [0, 0.9, 0] }}
           transition={{ duration: 0.9, times: [0, 0.35, 1], ease: 'easeOut' }}
           className="pointer-events-none absolute inset-0"
           style={{ boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--hud) 65%, transparent)' }}
         />
-      </motion.div>
+      )}
 
       <div
         onClick={handlePreviewTap}
@@ -716,34 +866,44 @@ export function CameraScreen({
       <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/65 to-transparent" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-72 bg-gradient-to-t from-black/80 to-transparent [@media(max-height:560px)]:h-40" />
 
+      {/*
+        The first-run copy belongs to the opening beat: it leaves the picture
+        as soon as the stream is live, so nothing is written over a frame that
+        is on the move. It is a first-open whisper, so switching lenses reuses
+        the pull without repeating it.
+      */}
       <AnimatePresence>
-        {!revealed && !hasRevealed.current && status !== 'denied' && status !== 'error' && (
-          <motion.div
-            key="intro-hint"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.25 }}
-            className="pointer-events-none absolute inset-0"
-          >
-            <div
-              className="absolute inset-x-0 flex flex-col items-center gap-1"
-              style={{ top: 'calc(50% + 32%)' }}
+        {status !== 'ready' &&
+          !hasRevealed.current &&
+          status !== 'denied' &&
+          status !== 'error' && (
+            <motion.div
+              key="intro-hint"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.22 }}
+              className="pointer-events-none absolute inset-0"
             >
-              <p className="label-caps text-white/50">Pulling focus</p>
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="pointer-events-auto inline-flex min-h-10 items-center gap-1.5 text-sm text-white/55 [text-shadow:0_1px_2px_rgb(0_0_0_/_0.7)]"
+              <div
+                className="absolute inset-x-0 flex flex-col items-center gap-1"
+                style={{ top: 'calc(50% + 32%)' }}
               >
-                <ImageIcon className="size-3.5" /> Choose from gallery
-              </button>
-            </div>
-          </motion.div>
-        )}
+                <p className="label-caps text-white/50">Pulling focus</p>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="pointer-events-auto inline-flex min-h-11 items-center gap-1.5 text-sm text-white/55 [text-shadow:0_1px_2px_rgb(0_0_0_/_0.7)]"
+                >
+                  <ImageIcon className="size-3.5" /> Choose from gallery
+                </button>
+              </div>
+            </motion.div>
+          )}
       </AnimatePresence>
 
-      {grid && status === 'ready' && (
+      {/* The grid belongs to the settled picture; it never rides a moving edge. */}
+      {grid && phase === 'locked' && (
         <div className="pointer-events-none absolute inset-0 grid grid-cols-3 grid-rows-3 drop-shadow-[0_0_1px_rgba(0,0,0,0.9)]">
           {Array.from({ length: 9 }).map((_, index) => (
             <div key={index} className="border border-white/35" />
@@ -751,30 +911,13 @@ export function CameraScreen({
         </div>
       )}
 
-      {/* The only viewfinder guide: a hairline HUD ring that breathes. It gives
-          way to the zoom readout for a moment, then returns. */}
-      {revealed && !zoomNotice && (
-        <motion.div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 m-auto size-[46px] rounded-full [@media(max-height:420px)]:hidden"
-          style={{
-            boxShadow:
-              'inset 0 0 0 1px color-mix(in srgb, var(--hud) 70%, transparent), 0 0 0 2px rgb(0 0 0 / 0.3)',
-          }}
-          initial={false}
-          animate={
-            reduceMotion
-              ? { opacity: 0.55 }
-              : { opacity: [0.4, 0.75, 0.4], scale: [0.98, 1.03, 0.98] }
-          }
-          transition={
-            reduceMotion ? { duration: 0.3 } : { duration: 4.4, repeat: Infinity, ease: 'easeInOut' }
-          }
-        >
-          <span className="absolute inset-0 m-auto size-[3px] rounded-full bg-white/80 shadow-[0_0_0_1px_rgba(0,0,0,0.45)]" />
-        </motion.div>
-      )}
-
+      {/*
+        There is no centre mark here, and that is the point: the framing guide
+        below already answers "where does the photo sit", and the focus
+        reticle answers "what am I pointing at". A third mark in the middle of
+        the frame repeated the first one, breathed forever, and read as a
+        smudge on the lens.
+      */}
       <AnimatePresence>
         {zoomNotice ? (
           <motion.div
@@ -800,10 +943,26 @@ export function CameraScreen({
         {zoomNotice ? `Zoom ${formatZoom(zoom)}` : ''}
       </span>
 
-      <AnimatePresence>
-        {focusPoint && (
+      {/*
+        The focus reticle speaks the same language as the framing guide: the
+        same corner arms, the same 2px HUD-mint stroke, the same hairline
+        separation, so a mark that appears over the photograph looks like it
+        belongs to the frame rather than to the interface. The pop grows from
+        the tapped point, not from the corner of the mark.
+      */}
+      {focusPoint && (
+        <span
+          key={focusPoint.id}
+          className="pointer-events-none absolute size-[72px] -translate-x-1/2 -translate-y-1/2"
+          style={{
+            left: `${(focusPoint?.x ?? 0) * 100}%`,
+            top: `${(focusPoint?.y ?? 0) * 100}%`,
+            filter: markSeparation,
+          }}
+        >
           <motion.span
-            key={focusPoint.id}
+            aria-hidden
+            className="absolute inset-0 block"
             initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 1.5 }}
             animate={
               reduceMotion
@@ -812,11 +971,16 @@ export function CameraScreen({
             }
             transition={{ duration: 1.1, times: [0, 0.15, 0.7, 1] }}
             onAnimationComplete={() => setFocusPoint(null)}
-            className="pointer-events-none absolute size-[80px] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-hud/90 ring-2 ring-black/20"
-            style={{ left: `${(focusPoint?.x ?? 0) * 100}%`, top: `${(focusPoint?.y ?? 0) * 100}%` }}
-          />
-        )}
-      </AnimatePresence>
+          >
+            {guideCorners.map((corner) => (
+              <span
+                key={corner.position}
+                className={cn('absolute size-[18px] border-hud', corner.position, corner.edges)}
+              />
+            ))}
+          </motion.span>
+        </span>
+      )}
 
       <AnimatePresence>
         {flash && (
@@ -833,15 +997,16 @@ export function CameraScreen({
       {/*
         Chrome is one flex column so a safe area can never push a control into
         another one: header (identity, location, places), open viewfinder, then
-        the capture row clear of the deck.
+        the capture row clear of the deck. It arrives only once the frame is
+        locked — a control that fades in over a moving edge cannot be aimed at.
       */}
       <div className="pointer-events-none relative z-10 flex h-full flex-col">
         <header
-          inert={!revealed}
+          inert={phase !== 'locked'}
           className={cn(
             'flex flex-wrap items-start gap-[8px] px-[12px] safe-top',
             'transition-opacity duration-300 delay-100',
-            revealed ? 'opacity-100' : 'pointer-events-none opacity-0',
+            phase === 'locked' ? 'opacity-100' : 'pointer-events-none opacity-0',
           )}
         >
           {/*
@@ -972,41 +1137,102 @@ export function CameraScreen({
             scrim as every other string drawn over the photograph. It sits on
             its own full-width row so a 200% root size cannot squeeze it into
             an ellipsis.
+
+            When the guide has proposed a shot, that line becomes the shot: an
+            overline names it, the title says what to look for, the
+            instruction says how. The generic line leaves rather than competes
+            with it.
+
+            The words are the guide's, so they keep the guide's voice: the
+            serif the report uses for a step is the serif used here, over the
+            live frame. The instruction can be a full sentence, so it is
+            clamped to two lines and the title to one: the block keeps a fixed
+            height and the header above it never moves. The scrim and the
+            hairline are the ones every other string over the photograph uses,
+            so the text survives a blown-out sky.
           */}
           <div className="w-full basis-full">
-            <p
-              className="glass-dark-live pointer-events-none mx-auto w-fit max-w-full truncate rounded-full px-[12px] py-[4px] text-xs font-medium text-white"
-            >
-              Point at one thing
-            </p>
+            <AnimatePresence initial={false}>
+              {pendingStep ? (
+                <motion.div
+                  key="pending-step"
+                  initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
+                  transition={{ duration: reduceMotion ? 0 : 0.18, ease: 'easeOut' }}
+                  className={cn(
+                    'glass-dark-live pointer-events-auto mx-auto w-full max-w-[420px] rounded-2xl px-[12px] py-[6px]',
+                    hudEdge,
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-[8px]">
+                    <p className="label-caps min-w-0 flex-1 truncate pt-[14px] text-white/90">
+                      Next shot
+                    </p>
+                    <button
+                      type="button"
+                      onClick={dismissPendingStep}
+                      className="-mr-[4px] inline-flex min-h-[44px] shrink-0 items-center rounded-full border border-white/25 px-[12px] text-[13px] font-medium text-white transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
+                    >
+                      Not now
+                    </button>
+                  </div>
+                  <p className="display mt-[2px] truncate text-[22px] text-white">
+                    {pendingStep.title}
+                  </p>
+                  <p className="mt-[2px] line-clamp-2 break-words font-serif text-[15px] leading-[1.5] text-white/90">
+                    {pendingStep.instruction}
+                  </p>
+                </motion.div>
+              ) : (
+                <motion.p
+                  key="point-hint"
+                  initial={reduceMotion ? { opacity: 1 } : { opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: reduceMotion ? 0 : 0.18, ease: 'easeOut' }}
+                  className="glass-dark-live pointer-events-none mx-auto w-fit max-w-full truncate rounded-full px-[12px] py-[4px] text-xs font-medium text-white"
+                >
+                  Point at one thing
+                </motion.p>
+              )}
+            </AnimatePresence>
           </div>
         </header>
 
         <div className="relative min-h-0 flex-1">
           {/*
-            A framing guide: four thin HUD-mint brackets at a 4:3 ratio. It is
-            a mark, not a control, so it stays out of the way and the
-            photograph remains the loudest thing on the screen.
+            The framing guide: four thin HUD-mint corner arms at a 4:3 ratio —
+            the shape the guide later points at inside the photograph. It is
+            the only permanent mark in the picture, so it stays quiet: a
+            hairline of separation traces each arm and keeps it readable
+            against a blown-out sky. It arrives with the chrome, once the
+            frame is locked.
           */}
-          {revealed && (
+          <div
+            aria-hidden
+            className={cn(
+              'pointer-events-none absolute inset-0 grid place-items-center px-[16px]',
+              'transition-opacity duration-300',
+              phase === 'locked' ? 'opacity-100' : 'opacity-0',
+            )}
+          >
             <div
-              aria-hidden
-              className="pointer-events-none absolute inset-0 grid place-items-center px-[16px]"
+              className="relative aspect-[4/3] w-[min(78%,260px)]"
+              style={{ filter: markSeparation }}
             >
-              <div className="relative aspect-[4/3] w-[min(78%,260px)] drop-shadow-[0_1px_2px_rgb(0_0_0_/_0.7)]">
-                {guideCorners.map((corner) => (
-                  <span
-                    key={corner.position}
-                    className={cn(
-                      'absolute size-[26px] border-hud',
-                      corner.position,
-                      corner.edges,
-                    )}
-                  />
-                ))}
-              </div>
+              {guideCorners.map((corner) => (
+                <span
+                  key={corner.position}
+                  className={cn(
+                    'absolute size-[26px] border-hud',
+                    corner.position,
+                    corner.edges,
+                  )}
+                />
+              ))}
             </div>
-          )}
+          </div>
 
           {/*
             The first-run copy has to share the top of the frame with the
@@ -1048,11 +1274,11 @@ export function CameraScreen({
         </div>
 
         <footer
-          inert={!revealed}
+          inert={phase !== 'locked'}
           className={cn(
             'flex flex-col items-center px-[16px]',
             'transition-opacity duration-300 delay-100',
-            revealed ? 'opacity-100' : 'pointer-events-none opacity-0',
+            phase === 'locked' ? 'opacity-100' : 'pointer-events-none opacity-0',
           )}
           style={{ paddingBottom: 'calc(5.5rem + env(safe-area-inset-bottom))' }}
         >
@@ -1119,6 +1345,9 @@ export function CameraScreen({
           if (file) {
             haptic('light', hapticsEnabled)
             onCapture(file)
+            // An imported photo answers the camera as much as a shutter press
+            // does, so the suggestion is spent either way.
+            consumePendingStep()
           }
           event.target.value = ''
         }}

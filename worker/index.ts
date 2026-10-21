@@ -5,7 +5,13 @@ import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import type { AttractionReport, GuideLanguage } from '@shared/types'
 import { GeminiProvider } from './services/gemini'
 import { MockVisionProvider } from './services/mock'
-import { ProviderError, type AppEnv, type VisionInput, type VisionProvider } from './types'
+import {
+  ProviderError,
+  type AppEnv,
+  type VisionContinuation,
+  type VisionInput,
+  type VisionProvider,
+} from './types'
 
 const app = new Hono<{ Bindings: AppEnv }>()
 
@@ -120,6 +126,43 @@ function languageFrom(value: FormDataEntryValue | null): GuideLanguage {
 }
 
 /**
+ * The shot the traveller was asked to take, when the photo answers a step the
+ * guide proposed. It is a hint about the walk, never a contract: a malformed
+ * field is ignored the same way a malformed location is, because a broken
+ * caption must not fail the photo.
+ */
+function continuationFrom(value: FormDataEntryValue | null): VisionContinuation | undefined {
+  if (typeof value !== 'string' || !value.trim()) return undefined
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(value)
+  } catch {
+    return undefined
+  }
+  if (!parsed || typeof parsed !== 'object') return undefined
+
+  const { placeTitle, placeName, instruction } = parsed as Record<string, unknown>
+  if (
+    typeof placeTitle !== 'string' ||
+    typeof placeName !== 'string' ||
+    typeof instruction !== 'string'
+  ) {
+    return undefined
+  }
+
+  const continuation: VisionContinuation = {
+    placeTitle: placeTitle.trim(),
+    placeName: placeName.trim(),
+    instruction: instruction.trim(),
+  }
+  if (!continuation.placeTitle || !continuation.placeName || !continuation.instruction) {
+    return undefined
+  }
+  return continuation
+}
+
+/**
  * A failed analysis is never a silent failure: the provider's own code and
  * message survive, and anything else becomes an actionable `analysis_failed`.
  */
@@ -210,6 +253,7 @@ app.post('/api/analyze', async (c) => {
   }
 
   const language = languageFrom(form.get('language'))
+  const continuation = continuationFrom(form.get('continuation'))
   const provider = providerFor(c.env)
   const started = Date.now()
   const report = await analyzeWith(provider, {
@@ -217,6 +261,7 @@ app.post('/api/analyze', async (c) => {
     mimeType: image.type,
     location,
     language,
+    continuation,
   })
 
   return c.json(

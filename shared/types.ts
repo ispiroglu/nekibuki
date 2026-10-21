@@ -51,6 +51,33 @@ export interface QuickFact {
   value: string
 }
 
+/**
+ * A strange-but-true fact about the place. Not a quiz answer and not a
+ * restatement of a quick fact: the odd detail a local would tell you.
+ */
+export interface Oddity {
+  id: string
+  /** The strange fact in a few words. */
+  title: string
+  body: string
+}
+
+/**
+ * A shot that would take the traveller further. The instruction is what the
+ * camera should be pointed at next.
+ */
+export interface NextStep {
+  id: string
+  /** Short overline, e.g. "Step back" */
+  label: string
+  /** What to look for, e.g. "The arch that frames the square" */
+  title: string
+  /** The concrete shot to take, written for the viewfinder. */
+  instruction: string
+  /** Why this shot is worth taking. */
+  why: string
+}
+
 export interface AttractionReport {
   title: string
   /** What kind of thing it is, e.g. "Iron lattice tower" */
@@ -70,6 +97,10 @@ export interface AttractionReport {
   trivia: Trivia[]
   visualReferences: VisualReference[]
   sections: GuideSection[]
+  /** 2–3 strange-but-true facts. Optional so guides saved earlier still load. */
+  oddities?: Oddity[]
+  /** 2–3 shots that would take the traveller further. */
+  nextSteps?: NextStep[]
   suggestedQuestions: string[]
 }
 

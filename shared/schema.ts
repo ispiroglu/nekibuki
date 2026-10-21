@@ -40,6 +40,20 @@ export const guideSectionSchema = z.object({
   seeInPhoto: z.string().max(240).optional(),
 })
 
+export const odditySchema = z.object({
+  id: z.string(),
+  title: z.string().min(1).max(90),
+  body: z.string().min(1).max(420),
+})
+
+export const nextStepSchema = z.object({
+  id: z.string(),
+  label: z.string().min(1).max(40),
+  title: z.string().min(1).max(80),
+  instruction: z.string().min(1).max(200),
+  why: z.string().min(1).max(240),
+})
+
 export const reportSchema = z.object({
   title: z.string().min(1).max(120),
   kind: z.string().min(1).max(80),
@@ -59,6 +73,10 @@ export const reportSchema = z.object({
   trivia: z.array(triviaSchema).length(4),
   visualReferences: z.array(visualReferenceSchema).min(2).max(6),
   sections: z.array(guideSectionSchema).min(2).max(5),
+  // Both are optional: a guide written before these fields existed must still
+  // load, and a provider that skips them must not fail the whole report.
+  oddities: z.array(odditySchema).min(2).max(3).optional(),
+  nextSteps: z.array(nextStepSchema).min(2).max(3).optional(),
   suggestedQuestions: z.array(z.string().max(140)).min(2).max(5),
 })
 

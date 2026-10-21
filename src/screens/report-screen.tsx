@@ -14,6 +14,9 @@ import {
 import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
+import type { NextStep } from '@shared/types'
+import { NextSteps } from '@/components/report/next-step'
+import { OddityCards } from '@/components/report/oddity-cards'
 import { PhotoHero } from '@/components/report/photo-hero'
 import { TriviaCarousel } from '@/components/report/trivia-carousel'
 import { Button } from '@/components/ui/button'
@@ -52,6 +55,7 @@ export function ReportScreen() {
   const { analysis, loading, error, setAnalysis, repository } = useAnalysis(id)
   const bumpHistory = useAppStore((state) => state.bumpHistory)
   const setScreenIndex = useAppStore((state) => state.setScreenIndex)
+  const setPendingStep = useAppStore((state) => state.setPendingStep)
   const hapticsEnabled = usePreferences((state) => state.haptics)
   const reduceMotion = useReducedMotion()
   const [chatOpen, setChatOpen] = useState(false)
@@ -238,6 +242,23 @@ export function ReportScreen() {
         ? 'Likely match'
         : 'Best guess'
 
+  /**
+   * Hands a step to the camera and walks the traveller over to it: the
+   * instruction travels with the shot, so the viewfinder knows what it is
+   * being asked to look for.
+   */
+  const shootStep = (step: NextStep) => {
+    setPendingStep({
+      id: step.id,
+      title: step.title,
+      instruction: step.instruction,
+      placeTitle: report.title,
+      placeName: report.location.name,
+    })
+    setScreenIndex(1)
+    navigate('/')
+  }
+
   return (
     <div className="min-h-dvh bg-background">
       <PhotoHero
@@ -359,6 +380,17 @@ export function ReportScreen() {
           </div>
         </motion.section>
 
+        {/*
+          The strange-but-true notes sit with the other surprising material,
+          straight after the trivia. The component owns its section and its
+          heading; this wrapper only carries the entrance.
+        */}
+        {report.oddities && report.oddities.length > 0 && (
+          <motion.section variants={reduceMotion ? undefined : staggerItem} className="mt-10">
+            <OddityCards oddities={report.oddities} />
+          </motion.section>
+        )}
+
         <motion.section variants={reduceMotion ? undefined : staggerItem} className="mt-10">
           <h2 className="text-title font-medium tracking-[-0.01em]">What you are looking at</h2>
           <ol className="mt-4 space-y-4">
@@ -405,6 +437,23 @@ export function ReportScreen() {
             ))}
           </div>
         </motion.section>
+
+        {/*
+          The route comes last but one: the guide has finished explaining the
+          place and now hands over the camera. The chat block that follows is
+          the page's last word — the traveller leaves with a question, not
+          with a button to press.
+        */}
+        {report.nextSteps && report.nextSteps.length > 0 && (
+          <motion.section variants={reduceMotion ? undefined : staggerItem} className="mt-10">
+            <NextSteps
+              steps={report.nextSteps}
+              placeTitle={report.title}
+              placeName={report.location.name}
+              onShoot={shootStep}
+            />
+          </motion.section>
+        )}
 
         <motion.section variants={reduceMotion ? undefined : staggerItem} className="mt-10">
           <h2 className="text-title font-medium tracking-[-0.01em]">Still curious?</h2>

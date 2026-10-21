@@ -81,7 +81,24 @@ export function Shell() {
 
   const handleCapture = useCallback(
     (blob: Blob) => {
-      setCapture({ blob, previewUrl: URL.createObjectURL(blob) })
+      // A shot that answers a suggested step carries the step with it: the
+      // guide has to know this is the next frame on the same walk, not a new
+      // place. The camera consumes the step right after this call, so it is
+      // read here, while it is still in the store.
+      const step = useAppStore.getState().pendingStep
+      const continuation = step
+        ? {
+            placeTitle: step.placeTitle,
+            placeName: step.placeName,
+            instruction: step.instruction,
+          }
+        : undefined
+
+      setCapture({
+        blob,
+        previewUrl: URL.createObjectURL(blob),
+        ...(continuation ? { continuation } : {}),
+      })
     },
     [setCapture],
   )
