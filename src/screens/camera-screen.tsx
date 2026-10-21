@@ -1,9 +1,9 @@
 import type { GeoPoint } from '@shared/types'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import {
+  Bookmark,
   Camera as CameraIcon,
   ChevronDown,
-  Clock,
   Image as ImageIcon,
   Loader2,
   MapPin,
@@ -17,11 +17,9 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Logo } from '@/components/brand/logo'
 import { formatZoom, ViewfinderSettings } from '@/components/capture/viewfinder-settings'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { captureVideoFrame, captureVideoStill, coverSourceRect } from '@/lib/image'
 import { haptic } from '@/lib/haptics'
-import { useAuth } from '@/lib/auth'
 import { cn, clamp } from '@/lib/utils'
 import { usePreferences } from '@/store/preferences'
 
@@ -72,9 +70,6 @@ function focusSupport(track: MediaStreamTrack): 'supported' | 'unsupported' | 'u
   }
 }
 
-/** Camera chrome sits in direct daylight, so it needs a stronger scrim than `glass-dark`. */
-const cameraChromeStyle = { background: 'rgba(14, 14, 13, 0.66)' }
-
 /**
  * A dark companion hairline under white chrome. Without it a white edge or a
  * HUD mark dissolves into a bright sky; the report's photo markers use the same
@@ -87,6 +82,17 @@ const captureFailedMessage = "Couldn't grab that frame — try again."
 /** Long enough to be deliberate, short enough not to feel stuck. */
 const longPressMs = 420
 
+/**
+ * The four corners of the framing guide. Each one is a thin HUD-mint arm; the
+ * guide carries a soft dark separation so the mark survives a bright sky.
+ */
+const guideCorners = [
+  { position: 'left-0 top-0', edges: 'border-l-[2px] border-t-[2px]' },
+  { position: 'right-0 top-0', edges: 'border-r-[2px] border-t-[2px]' },
+  { position: 'bottom-0 left-0', edges: 'border-b-[2px] border-l-[2px]' },
+  { position: 'bottom-0 right-0', edges: 'border-b-[2px] border-r-[2px]' },
+]
+
 export function CameraScreen({
   active,
   onCapture,
@@ -94,7 +100,6 @@ export function CameraScreen({
   locationStatus,
   onRequestLocation,
   onClearLocation,
-  onOpenProfile,
   onOpenHistory,
 }: {
   active: boolean
@@ -103,6 +108,11 @@ export function CameraScreen({
   locationStatus: 'idle' | 'requesting' | 'ready' | 'off' | 'disabled'
   onRequestLocation: () => void
   onClearLocation: () => void
+  /**
+   * The camera no longer renders a second profile control — "You" lives in the
+   * bottom nav only, so one destination has one control. The prop stays in the
+   * signature until the shell stops passing it.
+   */
   onOpenProfile: () => void
   onOpenHistory: () => void
 }) {
@@ -125,7 +135,6 @@ export function CameraScreen({
   const settingsHintSeen = useRef(false)
   const reduceMotion = useReducedMotion()
   const hapticsEnabled = usePreferences((state) => state.haptics)
-  const { user } = useAuth()
 
   const [status, setStatus] = useState<CameraStatus>('idle')
   const [restartToken, setRestartToken] = useState(0)
@@ -566,7 +575,6 @@ export function CameraScreen({
         .filter((value, index, all) => all.indexOf(value) === index)
     : []
 
-  const initial = (user?.name?.trim() || user?.email || 'T').slice(0, 1).toUpperCase()
   const locationLabel =
     locationStatus === 'requesting'
       ? 'Locating'
@@ -590,6 +598,13 @@ export function CameraScreen({
 
   return (
     <section className="relative h-full w-full overflow-hidden bg-black text-white">
+      {/*
+        The deck keeps every panel mounted, so the panel that owns the route
+        must be the only heading on it. The camera has no visible title, so it
+        carries a visually hidden one while it is the active panel.
+      */}
+      {active && <h1 className="sr-only">Camera</h1>}
+
       {/*
         The viewfinder starts as a small, soft-edged window and pulls open to
         full bleed the moment the stream is ready. Same geometry as the tap
@@ -762,10 +777,9 @@ export function CameraScreen({
           >
             <span
               className={cn(
-                'glass-dark inline-flex min-h-11 min-w-14 items-center justify-center rounded-full px-3 text-sm font-semibold tabular-nums text-white',
+                'glass-dark inline-flex min-h-[44px] min-w-[56px] items-center justify-center rounded-full px-[12px] text-sm font-semibold tabular-nums text-white',
                 hudEdge,
               )}
-              style={cameraChromeStyle}
             >
               {formatZoom(zoom)}
             </span>
@@ -788,7 +802,7 @@ export function CameraScreen({
             }
             transition={{ duration: 1.1, times: [0, 0.15, 0.7, 1] }}
             onAnimationComplete={() => setFocusPoint(null)}
-            className="pointer-events-none absolute size-20 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-hud/90 ring-2 ring-black/20"
+            className="pointer-events-none absolute size-[80px] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-hud/90 ring-2 ring-black/20"
             style={{ left: `${(focusPoint?.x ?? 0) * 100}%`, top: `${(focusPoint?.y ?? 0) * 100}%` }}
           />
         )}
@@ -815,144 +829,174 @@ export function CameraScreen({
         <header
           inert={!revealed}
           className={cn(
-            'grid grid-cols-[auto_1fr_auto] items-center gap-3 px-4 safe-top',
+            'flex flex-wrap items-start gap-[8px] px-[12px] safe-top',
             'transition-opacity duration-300 delay-100',
             revealed ? 'opacity-100' : 'pointer-events-none opacity-0',
           )}
         >
+          {/*
+            The shelf the long press opens needs a visible trigger: the hint is
+            a one-time, five-second whisper and the old control was `sr-only`.
+            This is the real button — 44×44, glass, HUD mint — and the long
+            press stays as the shortcut.
+          */}
           <button
+            ref={settingsTriggerRef}
             type="button"
-            onClick={onOpenProfile}
-            aria-label="Your profile"
+            onClick={(event) => {
+              if (settingsOpen) {
+                closeSettings(true)
+                return
+              }
+              openSettings(event.detail === 0 ? 'key' : 'pointer')
+            }}
+            aria-label="Viewfinder settings"
+            aria-haspopup="dialog"
+            aria-expanded={settingsOpen}
+            aria-controls={settingsOpen ? settingsPanelId : undefined}
+            disabled={status !== 'ready'}
             className={cn(
-              'glass-dark pointer-events-auto rounded-full p-0.5 transition-transform duration-150 ease-out active:scale-95',
+              'glass-dark pointer-events-auto grid size-[44px] shrink-0 place-items-center rounded-full text-hud transition-transform duration-150 ease-out active:scale-95 disabled:opacity-40',
+              'aria-expanded:bg-white/15',
               hudEdge,
             )}
-            style={cameraChromeStyle}
           >
-            <Avatar className="size-10">
-              <AvatarFallback className="text-base leading-none">{initial}</AvatarFallback>
-            </Avatar>
+            <SlidersHorizontal className="size-[18px]" />
           </button>
 
-          <div className="pointer-events-auto relative flex justify-center">
-            <button
-              ref={locationChipRef}
-              type="button"
-              onClick={handleLocationChip}
-              aria-haspopup={locationStatus === 'ready' ? 'menu' : undefined}
-              aria-expanded={locationStatus === 'ready' ? locationMenuOpen : undefined}
-              aria-controls={locationStatus === 'ready' ? locationMenuId : undefined}
-              className={cn(
-                'glass-dark flex min-h-11 items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-medium text-white/95 transition-transform duration-150 ease-out active:scale-[0.98]',
-                hudEdge,
-              )}
-              style={cameraChromeStyle}
-            >
-              {locationStatus === 'requesting' ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : location ? (
-                <MapPin className="size-4 text-hud" />
-              ) : (
-                <MapPinOff className="size-4 text-white/85" />
-              )}
-              {locationLabel}
-            </button>
+          <div className="pointer-events-auto flex min-w-0 flex-1 flex-col items-center gap-[4px]">
+            <div className="relative flex w-full min-w-0 justify-center">
+              <button
+                ref={locationChipRef}
+                type="button"
+                onClick={handleLocationChip}
+                aria-haspopup={locationStatus === 'ready' ? 'menu' : undefined}
+                aria-expanded={locationStatus === 'ready' ? locationMenuOpen : undefined}
+                aria-controls={locationStatus === 'ready' ? locationMenuId : undefined}
+                className={cn(
+                  'glass-dark flex min-h-[44px] min-w-0 max-w-full items-center gap-[6px] rounded-full px-[12px] py-[6px] text-xs font-medium text-white/95 transition-transform duration-150 ease-out active:scale-[0.98]',
+                  hudEdge,
+                )}
+              >
+                {locationStatus === 'requesting' ? (
+                  <Loader2 className="size-[16px] shrink-0 animate-spin" />
+                ) : location ? (
+                  <MapPin className="size-[16px] shrink-0 text-hud" />
+                ) : (
+                  <MapPinOff className="size-[16px] shrink-0 text-white/85" />
+                )}
+                <span className="min-w-0 truncate">{locationLabel}</span>
+              </button>
 
-            <AnimatePresence>
-              {locationMenuOpen && (
-                <motion.div
-                  ref={locationMenuRef}
-                  id={locationMenuId}
-                  role="menu"
-                  aria-label="Location options"
-                  onKeyDown={handleLocationMenuKeyDown}
-                  initial={reduceMotion ? false : { opacity: 0, y: -6, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -6, scale: 0.98 }}
-                  transition={reduceMotion ? { duration: 0 } : { duration: 0.16, ease: 'easeOut' }}
-                  className={cn(
-                    'glass-dark absolute left-1/2 top-full z-20 mt-2 flex -translate-x-1/2 flex-col overflow-hidden rounded-2xl text-left text-sm',
-                    hudEdge,
-                  )}
-                  style={cameraChromeStyle}
-                >
-                  <button
-                    ref={(element) => {
-                      locationItemRefs.current[0] = element
-                    }}
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setLocationMenuOpen(false)
-                      haptic('light', hapticsEnabled)
-                      onRequestLocation()
-                    }}
-                    className="flex min-h-11 items-center gap-2 whitespace-nowrap px-4 text-white/90 transition-colors active:bg-white/10 focus-visible:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white/70"
+              <AnimatePresence>
+                {locationMenuOpen && (
+                  <motion.div
+                    ref={locationMenuRef}
+                    id={locationMenuId}
+                    role="menu"
+                    aria-label="Location options"
+                    onKeyDown={handleLocationMenuKeyDown}
+                    initial={reduceMotion ? false : { opacity: 0, y: -6, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -6, scale: 0.98 }}
+                    transition={reduceMotion ? { duration: 0 } : { duration: 0.16, ease: 'easeOut' }}
+                    className={cn(
+                      'glass-dark absolute left-1/2 top-full z-20 mt-2 flex -translate-x-1/2 flex-col overflow-hidden rounded-2xl text-left text-sm',
+                      hudEdge,
+                    )}
                   >
-                    <RefreshCw className="size-4" />
-                    Refresh location
-                  </button>
-                  <button
-                    ref={(element) => {
-                      locationItemRefs.current[1] = element
-                    }}
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setLocationMenuOpen(false)
-                      haptic('light', hapticsEnabled)
-                      onClearLocation()
-                    }}
-                    className="flex min-h-11 items-center gap-2 whitespace-nowrap border-t border-white/10 px-4 text-white/90 transition-colors active:bg-white/10 focus-visible:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white/70"
-                  >
-                    <MapPinOff className="size-4 text-hud" />
-                    Turn off location
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                    <button
+                      ref={(element) => {
+                        locationItemRefs.current[0] = element
+                      }}
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setLocationMenuOpen(false)
+                        haptic('light', hapticsEnabled)
+                        onRequestLocation()
+                      }}
+                      className="flex min-h-[44px] items-center gap-2 whitespace-nowrap px-[12px] text-white/90 transition-colors active:bg-white/10 focus-visible:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white/70"
+                    >
+                      <RefreshCw className="size-4" />
+                      Refresh location
+                    </button>
+                    <button
+                      ref={(element) => {
+                        locationItemRefs.current[1] = element
+                      }}
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setLocationMenuOpen(false)
+                        haptic('light', hapticsEnabled)
+                        onClearLocation()
+                      }}
+                      className="flex min-h-[44px] items-center gap-2 whitespace-nowrap border-t border-white/10 px-[12px] text-white/90 transition-colors active:bg-white/10 focus-visible:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white/70"
+                    >
+                      <MapPinOff className="size-4 text-hud" />
+                      Turn off location
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
 
           <button
             type="button"
             onClick={onOpenHistory}
-            aria-label="Places you looked at"
+            aria-label="Places"
             className={cn(
-              'glass-dark pointer-events-auto grid size-11 place-items-center rounded-full text-white transition-transform duration-150 ease-out active:scale-95',
+              'glass-dark pointer-events-auto grid size-[44px] shrink-0 place-items-center rounded-full text-white transition-transform duration-150 ease-out active:scale-95',
               hudEdge,
             )}
-            style={cameraChromeStyle}
           >
-            <Clock className="size-5" />
+            <Bookmark className="size-[20px]" />
           </button>
+
+          {/*
+            One persistent line under the location chip. The frame used to
+            offer nothing but chrome; a traveller needs to know what the
+            camera wants before the first shutter press. It carries the same
+            scrim as every other string drawn over the photograph. It sits on
+            its own full-width row so a 200% root size cannot squeeze it into
+            an ellipsis.
+          */}
+          <div className="w-full basis-full">
+            <p
+              className="glass-dark pointer-events-none mx-auto w-fit max-w-full truncate rounded-full px-[12px] py-[4px] text-xs font-medium text-white"
+            >
+              Point at one thing
+            </p>
+          </div>
         </header>
 
-        <div className="group relative min-h-0 flex-1">
-          {/* Keyboard path to the shelf the long press opens. Invisible at rest,
-              so the viewfinder still carries only six controls. */}
-          <button
-            ref={settingsTriggerRef}
-            type="button"
-            aria-haspopup="dialog"
-            disabled={status !== 'ready'}
-            aria-expanded={settingsOpen}
-            aria-controls={settingsOpen ? settingsPanelId : undefined}
-            onClick={() => {
-              if (settingsOpen) closeSettings(true)
-              else openSettings('key')
-            }}
-            className={cn(
-              'sr-only rounded-full text-xs font-medium text-white',
-              'focus:not-sr-only focus:pointer-events-auto focus:absolute focus:left-1/2 focus:top-2 focus:z-20 focus:inline-flex focus:min-h-11 focus:-translate-x-1/2 focus:items-center focus:gap-1.5 focus:px-4',
-              'glass-dark',
-              hudEdge,
-            )}
-            style={cameraChromeStyle}
-          >
-            <SlidersHorizontal className="size-4" />
-            Viewfinder settings
-          </button>
+        <div className="relative min-h-0 flex-1">
+          {/*
+            A framing guide: four thin HUD-mint brackets at a 4:3 ratio. It is
+            a mark, not a control, so it stays out of the way and the
+            photograph remains the loudest thing on the screen.
+          */}
+          {revealed && (
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 grid place-items-center px-[16px]"
+            >
+              <div className="relative aspect-[4/3] w-[min(78%,260px)] drop-shadow-[0_1px_2px_rgb(0_0_0_/_0.7)]">
+                {guideCorners.map((corner) => (
+                  <span
+                    key={corner.position}
+                    className={cn(
+                      'absolute size-[26px] border-hud',
+                      corner.position,
+                      corner.edges,
+                    )}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
 
           {/*
             The first-run copy has to share the top of the frame with the
@@ -997,9 +1041,9 @@ export function CameraScreen({
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: reduceMotion ? 0 : 0.3 }}
-                    className="pointer-events-none inline-flex items-center gap-1.5 text-xs font-medium text-white/80 [text-shadow:0_1px_3px_rgb(0_0_0_/_0.9)] group-focus-within:opacity-0"
+                    className="glass-dark pointer-events-none inline-flex min-h-[44px] items-center gap-[6px] rounded-full px-[12px] py-[6px] text-xs font-medium text-white"
                   >
-                    <SlidersHorizontal className="size-3.5" />
+                    <SlidersHorizontal className="size-[14px] text-hud" />
                     Hold for settings
                   </motion.p>
                 )}
@@ -1011,24 +1055,28 @@ export function CameraScreen({
         <footer
           inert={!revealed}
           className={cn(
-            'flex flex-col items-center px-5',
+            'flex flex-col items-center px-[16px]',
             'transition-opacity duration-300 delay-100',
             revealed ? 'opacity-100' : 'pointer-events-none opacity-0',
           )}
           style={{ paddingBottom: 'calc(5.5rem + env(safe-area-inset-bottom))' }}
         >
-          <div className="flex w-full max-w-sm items-center justify-between gap-4">
+          {/*
+            The capture row is sized in pixels, not in rem: at 200% text a
+            rem-sized shutter becomes a tall oval and the row no longer fits
+            a 320px phone. The shutter stays a true circle.
+          */}
+          <div className="flex w-full max-w-[360px] items-center justify-between gap-[12px]">
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               aria-label="Choose from gallery"
               className={cn(
-                'glass-dark pointer-events-auto grid size-12 place-items-center overflow-hidden rounded-xl text-white transition-transform duration-150 ease-out active:scale-95',
+                'glass-dark pointer-events-auto grid size-[48px] shrink-0 place-items-center overflow-hidden rounded-xl text-white transition-transform duration-150 ease-out active:scale-95',
                 hudEdge,
               )}
-              style={cameraChromeStyle}
             >
-              <ImageIcon className="size-5" />
+              <ImageIcon className="size-[20px]" />
             </button>
 
             <motion.button
@@ -1040,7 +1088,7 @@ export function CameraScreen({
               aria-busy={capturing}
               aria-label="Take a photo"
               className={cn(
-                'pointer-events-auto grid size-20 place-items-center rounded-full border-[3px] border-white/90 ring-2 ring-black/25',
+                'pointer-events-auto grid size-[80px] shrink-0 place-items-center rounded-full border-[3px] border-white/90 ring-2 ring-black/25',
                 capturing ? 'opacity-60' : 'disabled:opacity-40',
               )}
             >
@@ -1055,12 +1103,11 @@ export function CameraScreen({
               }}
               aria-label="Switch camera"
               className={cn(
-                'glass-dark pointer-events-auto grid size-12 place-items-center rounded-xl text-white transition-transform duration-150 ease-out active:scale-95',
+                'glass-dark pointer-events-auto grid size-[48px] shrink-0 place-items-center rounded-xl text-white transition-transform duration-150 ease-out active:scale-95',
                 hudEdge,
               )}
-              style={cameraChromeStyle}
             >
-              <SwitchCamera className="size-5" />
+              <SwitchCamera className="size-[20px]" />
             </button>
           </div>
         </footer>
