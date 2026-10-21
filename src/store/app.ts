@@ -14,6 +14,8 @@ interface AppState {
   setCapture: (capture: CaptureDraft | null) => void
   analyzing: boolean
   setAnalyzing: (analyzing: boolean) => void
+  viewfinderSettingsOpen: boolean
+  setViewfinderSettingsOpen: (open: boolean) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -25,4 +27,6 @@ export const useAppStore = create<AppState>((set) => ({
   setCapture: (capture) => set({ capture }),
   analyzing: false,
   setAnalyzing: (analyzing) => set({ analyzing }),
+  viewfinderSettingsOpen: false,
+  setViewfinderSettingsOpen: (viewfinderSettingsOpen) => set({ viewfinderSettingsOpen }),
 }))

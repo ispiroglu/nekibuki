@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button'
 import { captureVideoFrame, captureVideoStill, coverSourceRect } from '@/lib/image'
 import { haptic } from '@/lib/haptics'
 import { cn, clamp } from '@/lib/utils'
+import { useAppStore } from '@/store/app'
 import { usePreferences } from '@/store/preferences'
 
 type CameraStatus = 'idle' | 'starting' | 'ready' | 'denied' | 'error'
@@ -132,7 +133,6 @@ export function CameraScreen({
   const pressOrigin = useRef<{ x: number; y: number } | null>(null)
   const suppressTap = useRef(false)
   const zoomNoticeTimer = useRef<number | null>(null)
-  const settingsHintSeen = useRef(false)
   const reduceMotion = useReducedMotion()
   const hapticsEnabled = usePreferences((state) => state.haptics)
 
@@ -145,7 +145,7 @@ export function CameraScreen({
   const [torch, setTorch] = useState(false)
   const [grid, setGrid] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [showSettingsHint, setShowSettingsHint] = useState(false)
+  const setViewfinderSettingsOpen = useAppStore((state) => state.setViewfinderSettingsOpen)
   const [zoomNotice, setZoomNotice] = useState(0)
   const [helpOpen, setHelpOpen] = useState(false)
   const [flash, setFlash] = useState(false)
@@ -283,6 +283,7 @@ export function CameraScreen({
 
   const closeSettings = useCallback((restoreFocus = false) => {
     setSettingsOpen(false)
+    setViewfinderSettingsOpen(false)
     if (restoreFocus) {
       window.requestAnimationFrame(() => settingsTriggerRef.current?.focus())
     }
@@ -291,8 +292,8 @@ export function CameraScreen({
   const openSettings = useCallback(
     (source: 'pointer' | 'key') => {
       setLocationMenuOpen(false)
-      setShowSettingsHint(false)
       setSettingsOpen(true)
+      setViewfinderSettingsOpen(true)
       if (source === 'pointer') haptic('light', hapticsEnabled)
     },
     [hapticsEnabled],
@@ -332,21 +333,11 @@ export function CameraScreen({
   useEffect(() => {
     if (active && status === 'ready') return
     setSettingsOpen(false)
-    setShowSettingsHint(false)
+    setViewfinderSettingsOpen(false)
     setHelpOpen(false)
     clearLongPress()
     pressOrigin.current = null
   }, [active, status, clearLongPress])
-
-  // One quiet instruction per session, since the controls it hides have no
-  // visible trigger of their own.
-  useEffect(() => {
-    if (!revealed || settingsHintSeen.current) return
-    settingsHintSeen.current = true
-    setShowSettingsHint(true)
-    const timer = window.setTimeout(() => setShowSettingsHint(false), 5200)
-    return () => window.clearTimeout(timer)
-  }, [revealed])
 
   useEffect(() => {
     if (status !== 'denied') setHelpOpen(false)
@@ -589,6 +580,7 @@ export function CameraScreen({
     haptic('light', hapticsEnabled)
     if (locationStatus === 'ready') {
       setSettingsOpen(false)
+      setViewfinderSettingsOpen(false)
       setLocationMenuOpen((value) => !value)
       return
     }
@@ -1033,22 +1025,7 @@ export function CameraScreen({
                   announceZoom()
                 }}
               />
-            ) : (
-              <AnimatePresence>
-                {showSettingsHint && (
-                  <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: reduceMotion ? 0 : 0.3 }}
-                    className="glass-dark pointer-events-none inline-flex min-h-[44px] items-center gap-[6px] rounded-full px-[12px] py-[6px] text-xs font-medium text-white"
-                  >
-                    <SlidersHorizontal className="size-[14px] text-hud" />
-                    Hold for settings
-                  </motion.p>
-                )}
-              </AnimatePresence>
-            )}
+            ) : null}
           </div>
         </div>
 
