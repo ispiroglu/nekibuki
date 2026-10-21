@@ -1,9 +1,56 @@
-import { motion } from 'motion/react'
+import { motion, useReducedMotion } from 'motion/react'
 import { Loader2 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Logo } from '@/components/brand/logo'
 import { useAuth } from '@/lib/auth'
 import { spring } from '@/lib/motion'
+
+export interface OAuthFailure {
+  title: string
+  hint: string
+}
+
+interface OAuthError {
+  code: string
+}
+
+/**
+ * OAuth errors come back on the query string (PKCE) or the hash (implicit).
+ * Read both so a cancelled Google flow is never silent.
+ */
+export function readOAuthError(): OAuthError | null {
+  if (typeof window === 'undefined') return null
+  const sources = [
+    new URLSearchParams(window.location.search),
+    new URLSearchParams(window.location.hash.replace(/^#/, '')),
+  ]
+  for (const params of sources) {
+    const code = params.get('error') ?? params.get('error_code')
+    if (code) return { code }
+  }
+  return null
+}
+
+export function describeOAuthFailure(code: string | null): OAuthFailure {
+  switch (code) {
+    case 'access_denied':
+      return {
+        title: 'Sign-in was cancelled.',
+        hint: 'Nothing changed on your account. Try again when you’re ready.',
+      }
+    case 'temporarily_unavailable':
+    case 'server_error':
+      return {
+        title: 'Google couldn’t sign you in just now.',
+        hint: 'This is usually temporary. Try again in a moment.',
+      }
+    default:
+      return {
+        title: 'We couldn’t finish signing you in.',
+        hint: 'Allow cookies for this site, then try again.',
+      }
+  }
+}
 
 function GoogleMark({ className }: { className?: string }) {
   return (
@@ -31,37 +78,65 @@ function GoogleMark({ className }: { className?: string }) {
 export function LoginScreen() {
   const { signIn, loading, error, mode } = useAuth()
   const [pending, setPending] = useState(false)
+  const [oauth] = useState<OAuthError | null>(() => readOAuthError())
+  const reduceMotion = useReducedMotion()
+
+  // Show the provider error once, then leave a clean URL so a later sign-out
+  // does not resurrect a stale message.
+  useEffect(() => {
+    if (!oauth) return
+    const url = new URL(window.location.href)
+    url.search = ''
+    url.hash = ''
+    window.history.replaceState(window.history.state, '', url)
+  }, [oauth])
+
+  const failure: OAuthFailure | null = oauth
+    ? describeOAuthFailure(oauth.code)
+    : error
+      ? {
+          title: 'Sign-in didn’t start.',
+          hint: 'Check your connection, then try again.',
+        }
+      : null
+  const busy = pending || loading
 
   return (
-    <div className="flex min-h-dvh flex-col bg-background px-6 safe-top safe-bottom">
+    <div className="flex min-h-dvh flex-col bg-background px-5 safe-top safe-bottom sm:px-6 [@media(orientation:landscape)_and_(max-height:560px)]:grid [@media(orientation:landscape)_and_(max-height:560px)]:grid-cols-[1.05fr_0.95fr] [@media(orientation:landscape)_and_(max-height:560px)]:items-center [@media(orientation:landscape)_and_(max-height:560px)]:gap-10">
       <motion.div
-        initial={{ opacity: 0, y: 16 }}
+        initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={spring}
         className="flex flex-1 flex-col justify-center"
       >
         <p className="display text-lg text-brand-ink">Nekibuki</p>
-        <Logo className="mt-6 size-20 text-foreground" draw />
-        <h1 className="display mt-10 text-[3.25rem] font-medium">
+        <Logo className="mt-5 size-16 text-foreground sm:mt-6 sm:size-20 [@media(orientation:landscape)_and_(max-height:560px)]:mt-3 [@media(orientation:landscape)_and_(max-height:560px)]:size-12 [@media(max-height:360px)]:hidden" draw={!reduceMotion} />
+        <h1 className="display mt-7 text-[clamp(2.25rem,12vw,3.25rem)] font-medium sm:mt-10 [@media(orientation:landscape)_and_(max-height:560px)]:mt-4 [@media(orientation:landscape)_and_(max-height:560px)]:text-4xl [@media(max-height:360px)]:mt-3">
           A quiet guide for the places you <em className="not-italic text-brand-ink">walk past</em>.
         </h1>
-        <p className="mt-5 max-w-xs text-lg leading-relaxed text-muted-foreground">
+        <p className="mt-4 max-w-xs text-base leading-relaxed text-muted-foreground sm:mt-5 sm:text-lg [@media(orientation:landscape)_and_(max-height:560px)]:mt-4 [@media(orientation:landscape)_and_(max-height:560px)]:max-w-none [@media(orientation:landscape)_and_(max-height:560px)]:text-base [@media(orientation:landscape)_and_(max-height:560px)]:leading-6 [@media(max-height:360px)]:mt-3 [@media(max-height:360px)]:leading-snug">
           Point your camera at a monument, a landscape or a corner of a city. Nekibuki tells you what
           it is, what to look at, and four things worth remembering.
         </p>
       </motion.div>
 
       <motion.div
-        initial={{ opacity: 0, y: 16 }}
+        initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ ...spring, delay: 0.06 }}
-        className="pb-2"
+        className="pb-2 [@media(orientation:landscape)_and_(max-height:560px)]:py-4"
       >
-        {error && <p className="pb-3 text-sm text-destructive">{error}</p>}
+        {failure && (
+          <div role="alert" className="mb-4 rounded-2xl bg-secondary px-4 py-3">
+            <p className="text-sm font-medium text-foreground">{failure.title}</p>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{failure.hint}</p>
+          </div>
+        )}
 
         <button
           type="button"
-          disabled={pending || loading}
+          disabled={busy}
+          aria-busy={busy}
           onClick={async () => {
             setPending(true)
             try {
@@ -70,10 +145,19 @@ export function LoginScreen() {
               setPending(false)
             }
           }}
-          className="flex h-14 w-full items-center justify-center gap-3 rounded-full bg-primary text-[1.05rem] font-medium text-primary-foreground transition-transform duration-150 ease-out active:scale-[0.98] disabled:opacity-80"
+          className="flex h-14 w-full items-center justify-center gap-3 rounded-full bg-primary px-5 text-base font-medium text-primary-foreground transition-transform duration-150 ease-out active:scale-[0.98] disabled:opacity-80 motion-reduce:transition-none motion-reduce:active:scale-100"
         >
-          {pending ? <Loader2 className="size-5 animate-spin" /> : <GoogleMark className="size-5" />}
-          Continue with Google
+          {busy ? (
+            <>
+              <Loader2 aria-hidden className="size-5 animate-spin motion-reduce:animate-none" />
+              Signing you in…
+            </>
+          ) : (
+            <>
+              <GoogleMark className="size-5" />
+              {failure ? 'Try Google again' : 'Continue with Google'}
+            </>
+          )}
         </button>
 
         <p className="mt-4 text-center text-xs text-muted-foreground">
