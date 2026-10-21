@@ -946,7 +946,7 @@ export function CameraScreen({
           <button
             type="button"
             onClick={onOpenHistory}
-            aria-label="Places"
+            aria-label="Open places"
             className={cn(
               'glass-dark pointer-events-auto grid size-[44px] shrink-0 place-items-center rounded-full text-white transition-transform duration-150 ease-out active:scale-95',
               hudEdge,
