@@ -2,7 +2,7 @@ import { motion } from 'motion/react'
 import { cn } from '@/lib/utils'
 
 /**
- * The Nekibuki mark: an aperture ring with a clay core.
+ * The Nekibuki mark: an aperture ring with a brand-coloured core.
  * Pass `draw` to play the opening animation (login / splash).
  */
 export function Logo({
@@ -33,7 +33,7 @@ export function Logo({
         cx="60"
         cy="60"
         r="17"
-        className="fill-clay"
+        className="fill-brand"
         initial={draw ? { scale: 0.4, opacity: 0 } : false}
         animate={draw ? { scale: 1, opacity: 1 } : undefined}
         style={{ transformOrigin: '50% 50%', transformBox: 'fill-box' }}

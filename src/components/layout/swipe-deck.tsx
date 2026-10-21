@@ -283,7 +283,7 @@ export function SwipeDeck({
       onKeyDown={onKeyDown}
       style={{ touchAction: 'pan-y' }}
       className={cn(
-        'relative h-full w-full overflow-hidden outline-none select-none',
+        'relative h-full w-full overflow-hidden select-none focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring',
         dragging ? 'cursor-grabbing' : 'cursor-grab',
         className,
       )}

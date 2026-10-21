@@ -21,10 +21,10 @@ export function PageDots({
 }) {
   return (
     <div
-      role="tablist"
+      role="group"
       aria-label="Screens"
       className={cn(
-        'flex items-center gap-1 rounded-full p-1',
+        'flex items-center gap-2 rounded-full p-1',
         tone === 'dark' ? 'glass-dark' : 'glass',
         className,
       )}
@@ -34,12 +34,11 @@ export function PageDots({
         return (
           <button
             key={screen.index}
-            role="tab"
-            aria-selected={active}
+            aria-current={active ? 'page' : undefined}
             aria-label={screen.label}
             onClick={() => onSelect(screen.index)}
             className={cn(
-              'relative flex size-10 items-center justify-center rounded-full transition-colors duration-200',
+              'relative flex size-11 items-center justify-center rounded-full transition-colors duration-200',
               active
                 ? tone === 'dark'
                   ? 'text-white'

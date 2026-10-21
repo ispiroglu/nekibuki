@@ -29,3 +29,10 @@ npm-debug.log*
 
 # Generated
 worker-configuration.d.ts
+/shots/
+
+# Local agent tooling
+.opencode/
+
+# Scratch prototypes
+/prototype/

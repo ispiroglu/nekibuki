@@ -10,6 +10,7 @@ export function AppearanceSync() {
     const apply = () => {
       const dark = appearance === 'dark' || (appearance === 'system' && media.matches)
       document.documentElement.classList.toggle('dark', dark)
+      document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
     }
 
     apply()

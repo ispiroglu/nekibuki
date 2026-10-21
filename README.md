@@ -128,6 +128,34 @@ a carousel library, so the animation stays interruptible mid-swipe.
 - `bun run icons` — regenerates the PWA icons in `public/` from the aperture mark drawn in code.
 - `bun run shots` — walks every screen with Playwright and writes screenshots to `SHOT_DIR`
   (needs a dev server on :5173).
+- `bun run brand:shots` — captures the same screens under every brand preset and writes a
+  contact sheet to `SHOT_DIR/index.html` (default `shots/brand`).
+
+## Brand colour lab
+
+The hue is a token, not a coat of paint. `src/index.css` gives it three roles:
+`--brand` (fills on paper), `--brand-ink` (text on paper) and `--hud` (marks over a photo),
+plus `--hud-fg` for the ink that sits on a HUD fill.
+
+The default is **petrol**. Presets live next to those tokens (`petrol`, `clay`, `okra`, `lapis`,
+`saffron`). Compare them without touching code:
+
+```bash
+bun run dev:web
+open 'http://localhost:5173/?brand=clay'     # the terracotta experiment
+open 'http://localhost:5173/?brandlab=1'     # floating switcher, dev only
+```
+
+The choice is persisted in `localStorage`; omit the parameter (or use `?brand=petrol`) to return
+to the default.
+
+## Design context
+
+- [`PRODUCT.md`](PRODUCT.md) — durable product truth, users, constraints and principles.
+- [`DESIGN.md`](DESIGN.md) — machine-readable tokens plus the rules for using them.
+- [`docs/design-findings.md`](docs/design-findings.md) — the Impeccable audit, split into
+  file-owned workstreams for parallel implementation.
+
 - `bun run smoke` — end-to-end check: sign in, capture, read the report, ask a question, confirm
   it reached history. Point it anywhere with `BASE_URL=https://nekibuki.thecrafter.io`.
 

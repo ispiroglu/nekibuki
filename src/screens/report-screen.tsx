@@ -1,4 +1,4 @@
-import { motion } from 'motion/react'
+import { motion, useReducedMotion } from 'motion/react'
 import {
   ArrowUp,
   Bookmark,
@@ -11,7 +11,7 @@ import {
   Trash2,
   TriangleAlert,
 } from 'lucide-react'
-import { Suspense, lazy, useState } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { PhotoHero } from '@/components/report/photo-hero'
@@ -45,22 +45,48 @@ export function ReportScreen() {
   const bumpHistory = useAppStore((state) => state.bumpHistory)
   const setScreenIndex = useAppStore((state) => state.setScreenIndex)
   const hapticsEnabled = usePreferences((state) => state.haptics)
+  const reduceMotion = useReducedMotion()
   const [chatOpen, setChatOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [savingSaved, setSavingSaved] = useState(false)
 
   const goBack = () => {
     if (window.history.length > 1) navigate(-1)
     else navigate('/')
   }
 
+  const openChat = () => {
+    window.history.pushState({ chat: true }, '')
+    setChatOpen(true)
+  }
+
+  const closeChat = () => {
+    if (window.history.state?.chat) window.history.back()
+    else setChatOpen(false)
+  }
+
+  useEffect(() => {
+    if (!chatOpen) return
+    const onPopState = () => setChatOpen(false)
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [chatOpen])
+
   const toggleSaved = async () => {
-    if (!analysis || !repository) return
-    haptic('light', hapticsEnabled)
-    const updated = await repository.toggleSaved(analysis.id)
-    if (updated) {
-      setAnalysis(updated)
-      bumpHistory()
-      toast(updated.saved ? 'Saved to your places' : 'Removed from saved')
+    if (!analysis || !repository || savingSaved) return
+    setSavingSaved(true)
+    try {
+      const updated = await repository.toggleSaved(analysis.id)
+      if (updated) {
+        setAnalysis(updated)
+        bumpHistory()
+        haptic('light', hapticsEnabled)
+        toast(updated.saved ? 'Saved to your places' : 'Removed from saved')
+      }
+    } catch {
+      toast.error('Could not save this guide.')
+    } finally {
+      setSavingSaved(false)
     }
   }
 
@@ -104,7 +130,17 @@ export function ReportScreen() {
   if (loading) {
     return (
       <div className="min-h-dvh bg-background">
-        <Skeleton className="h-[52svh] w-full rounded-none" />
+        <Skeleton className="h-[60svh] min-h-[420px] w-full rounded-none" />
+        <div className="absolute inset-x-0 top-0 z-30 flex items-center px-4 safe-top">
+          <button
+            type="button"
+            onClick={goBack}
+            className="glass-dark grid size-11 place-items-center rounded-full text-white transition-transform duration-150 ease-out active:scale-95"
+            aria-label="Back"
+          >
+            <ChevronLeft className="size-5" />
+          </button>
+        </div>
         <div className="space-y-4 p-6">
           <Skeleton className="h-6 w-2/3" />
           <Skeleton className="h-4 w-full" />
@@ -186,11 +222,13 @@ export function ReportScreen() {
           <button
             type="button"
             onClick={() => void toggleSaved()}
+            disabled={savingSaved}
+            aria-pressed={analysis.saved}
             className={cn(
-              'glass-dark grid size-11 place-items-center rounded-full transition-transform duration-150 ease-out active:scale-95',
-              analysis.saved ? 'text-clay' : 'text-white',
+              'glass-dark grid size-11 place-items-center rounded-full transition-transform duration-150 ease-out active:scale-95 disabled:opacity-60',
+              analysis.saved ? 'text-hud' : 'text-white',
             )}
-            aria-label="Save"
+            aria-label={analysis.saved ? 'Remove from saved' : 'Save'}
           >
             <Bookmark className={cn('size-[18px]', analysis.saved && 'fill-current')} />
           </button>
@@ -214,25 +252,28 @@ export function ReportScreen() {
       </div>
 
       <motion.article
-        variants={staggerContainer}
-        initial="initial"
+        variants={reduceMotion ? undefined : staggerContainer}
+        initial={reduceMotion ? false : 'initial'}
         animate="animate"
-        className="relative -mt-24 px-6 pb-36"
+        className="relative mx-auto -mt-24 w-full max-w-[42rem] px-6 pb-36 select-text md:px-8"
       >
         <motion.span
-          variants={staggerItem}
-          className="inline-flex items-center gap-1.5 rounded-full bg-clay/15 px-3 py-1 text-xs font-medium text-clay"
+          variants={reduceMotion ? undefined : staggerItem}
+          className="inline-flex items-center gap-1.5 rounded-full bg-brand/15 px-3 py-1 text-xs font-medium text-brand-ink"
         >
           <Sparkles className="size-3" />
           {report.kind}
         </motion.span>
 
-        <motion.h1 variants={staggerItem} className="display mt-3 text-5xl font-medium">
+        <motion.h1
+          variants={reduceMotion ? undefined : staggerItem}
+          className="display mt-3 text-5xl font-medium"
+        >
           {report.title}
         </motion.h1>
 
         <motion.div
-          variants={staggerItem}
+          variants={reduceMotion ? undefined : staggerItem}
           className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm text-muted-foreground"
         >
           <span className="inline-flex items-center gap-1.5">
@@ -252,40 +293,45 @@ export function ReportScreen() {
         </motion.div>
 
         <motion.p
-          variants={staggerItem}
-          className="mt-6 font-serif text-[1.3rem] leading-[1.55] tracking-[-0.005em]"
+          variants={reduceMotion ? undefined : staggerItem}
+          className="mt-6 font-serif text-[1.375rem] leading-[1.55]"
         >
           {report.summary}
         </motion.p>
 
-        <motion.dl variants={staggerItem} className="mt-8 grid grid-cols-2 gap-2">
+        <motion.dl
+          variants={reduceMotion ? undefined : staggerItem}
+          className="mt-8 grid grid-cols-2 gap-2"
+        >
           {report.quickFacts.map((fact) => (
-            <div key={fact.label} className="rounded-2xl bg-secondary px-4 py-3">
-              <dt className="text-[0.7rem] font-medium tracking-[0.06em] text-muted-foreground uppercase">
+            <div key={fact.label} className="min-w-0 rounded-2xl bg-secondary px-4 py-3">
+              <dt className="text-[0.7rem] font-medium tracking-[0.06em] text-foreground/70 uppercase">
                 {fact.label}
               </dt>
-              <dd className="mt-0.5 font-serif text-lg leading-snug">{fact.value}</dd>
+              <dd className="mt-0.5 min-w-0 font-serif text-lg leading-snug break-words">
+                {fact.value}
+              </dd>
             </div>
           ))}
         </motion.dl>
 
-        <motion.section variants={staggerItem} className="mt-10">
+        <motion.section variants={reduceMotion ? undefined : staggerItem} className="mt-10">
           <h2 className="text-2xl font-medium tracking-[-0.01em]">Things most people miss</h2>
           <div className="mt-4">
             <TriviaCarousel trivia={report.trivia} />
           </div>
         </motion.section>
 
-        <motion.section variants={staggerItem} className="mt-10">
+        <motion.section variants={reduceMotion ? undefined : staggerItem} className="mt-10">
           <h2 className="text-2xl font-medium tracking-[-0.01em]">What you are looking at</h2>
           <ol className="mt-4 space-y-4">
             {report.visualReferences.map((reference, index) => (
               <li key={reference.id} className="flex gap-3">
-                <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-clay text-[11px] font-semibold text-white">
+                <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-brand text-[11px] font-semibold text-brand-fg">
                   {index + 1}
                 </span>
                 <div>
-                  <h3 className="font-serif text-lg leading-snug">{reference.title}</h3>
+                  <h3 className="font-serif text-xl leading-snug">{reference.title}</h3>
                   <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                     {reference.body}
                   </p>
@@ -295,17 +341,17 @@ export function ReportScreen() {
           </ol>
         </motion.section>
 
-        <motion.section variants={staggerItem} className="mt-10">
+        <motion.section variants={reduceMotion ? undefined : staggerItem} className="mt-10">
           <h2 className="text-2xl font-medium tracking-[-0.01em]">A closer look</h2>
           <div className="mt-5 space-y-7">
             {report.sections.map((section) => (
               <article key={section.id}>
-                <h3 className="font-serif text-xl leading-snug">{section.title}</h3>
-                <p className="mt-2 max-w-[34rem] text-[0.95rem] leading-[1.75] text-foreground/80">
+                <h3 className="text-xl font-medium leading-snug">{section.title}</h3>
+                <p className="mt-2 max-w-[32rem] font-serif text-[1.0625rem] leading-[1.7] text-foreground/80">
                   {section.body}
                 </p>
                 {section.seeInPhoto && (
-                  <p className="mt-3 flex max-w-[34rem] gap-2.5 border-l-2 border-clay/50 pl-4 text-sm leading-relaxed text-muted-foreground italic">
+                  <p className="mt-3 flex max-w-[34rem] gap-2.5 border-l-2 border-brand/50 pl-4 text-sm leading-relaxed text-muted-foreground italic">
                     <Eye className="mt-0.5 size-3.5 shrink-0" />
                     {section.seeInPhoto}
                   </p>
@@ -315,12 +361,12 @@ export function ReportScreen() {
           </div>
         </motion.section>
 
-        <motion.section variants={staggerItem} className="mt-10">
+        <motion.section variants={reduceMotion ? undefined : staggerItem} className="mt-10">
           <h2 className="text-2xl font-medium tracking-[-0.01em]">Still curious?</h2>
           <p className="mt-3 leading-relaxed text-foreground/85">
             Ask about anything you can see — the answer stays with this photo.
           </p>
-          <Button size="lg" className="mt-5" onClick={() => setChatOpen(true)}>
+          <Button size="lg" className="mt-5" onClick={openChat}>
             Ask a question
           </Button>
         </motion.section>
@@ -329,13 +375,13 @@ export function ReportScreen() {
       <div className="glass fixed inset-x-0 bottom-0 z-40 scroll-fade-b px-4 pt-3 safe-bottom">
         <button
           type="button"
-          onClick={() => setChatOpen(true)}
+          onClick={openChat}
           className="mx-auto flex w-full max-w-md items-center gap-2 rounded-full bg-card p-1 pl-4 shadow-sm transition-transform duration-150 ease-out active:scale-[0.99]"
         >
           <span className="flex-1 truncate text-left text-[16px] text-muted-foreground">
             Ask about {report.title}…
           </span>
-          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-clay text-white">
+          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand text-brand-fg">
             <ArrowUp className="size-5" />
           </span>
         </button>
@@ -343,7 +389,10 @@ export function ReportScreen() {
 
       <Sheet
         open={chatOpen}
-        onOpenChange={setChatOpen}
+        onOpenChange={(next) => {
+          if (next) openChat()
+          else closeChat()
+        }}
         title={report.title}
         description={`Continuing your photo of ${report.location.name}`}
       >

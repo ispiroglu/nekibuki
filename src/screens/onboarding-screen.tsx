@@ -14,10 +14,12 @@ interface Slide {
 
 /** Four quarter-round brackets, the way a viewfinder frames a subject. */
 function ViewfinderArt() {
+  const reduceMotion = useReducedMotion()
+
   return (
     <div className="relative grid size-52 place-items-center">
       <svg viewBox="0 0 120 120" fill="none" aria-hidden className="absolute inset-0 size-full">
-        <g stroke="var(--clay)" strokeWidth="4" strokeLinecap="round">
+        <g stroke="var(--brand)" strokeWidth="4" strokeLinecap="round">
           <path d="M10 40A30 30 0 0 1 40 10" />
           <path d="M80 10A30 30 0 0 1 110 40" />
           <path d="M110 80A30 30 0 0 1 80 110" />
@@ -25,8 +27,10 @@ function ViewfinderArt() {
         </g>
       </svg>
       <motion.span
-        animate={{ scale: [1, 1.05, 1] }}
-        transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut' }}
+        animate={reduceMotion ? { scale: 1 } : { scale: [1, 1.05, 1] }}
+        transition={
+          reduceMotion ? { duration: 0 } : { duration: 4.5, repeat: Infinity, ease: 'easeInOut' }
+        }
         className="text-foreground/15"
       >
         <Logo className="size-16" />
@@ -37,15 +41,16 @@ function ViewfinderArt() {
 
 /** One discovery: the photo, then the facts that come back with it. */
 function DiscoveryArt() {
+  const reduceMotion = useReducedMotion()
   const facts = [
     { label: 'Opened', value: '80 AD' },
     { label: 'Capacity', value: '~50,000' },
   ]
   return (
     <motion.div
-      initial={{ opacity: 0, y: 14 }}
+      initial={reduceMotion ? false : { opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={spring}
+      transition={reduceMotion ? { duration: 0 } : spring}
       className="w-52 rounded-2xl bg-card p-2 shadow-[0_0_0_1px_var(--border)]"
     >
       <div className="relative h-28 overflow-hidden rounded-xl bg-secondary">
@@ -59,9 +64,9 @@ function DiscoveryArt() {
         {facts.map((fact, index) => (
           <motion.div
             key={fact.label}
-            initial={{ opacity: 0, y: 8 }}
+            initial={reduceMotion ? false : { opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ ...spring, delay: 0.12 + index * 0.08 }}
+            transition={reduceMotion ? { duration: 0 } : { ...spring, delay: 0.12 + index * 0.08 }}
             className="rounded-xl bg-secondary px-2.5 py-2"
           >
             <dt className="text-[0.6rem] font-medium uppercase tracking-[0.06em] text-muted-foreground">
@@ -77,28 +82,29 @@ function DiscoveryArt() {
 
 /** The conversation that stays attached to a place. */
 function ConversationArt() {
+  const reduceMotion = useReducedMotion()
   return (
     <div className="w-64 space-y-3">
       <motion.p
-        initial={{ opacity: 0, x: 12 }}
+        initial={reduceMotion ? false : { opacity: 0, x: 12 }}
         animate={{ opacity: 1, x: 0 }}
-        transition={spring}
+        transition={reduceMotion ? { duration: 0 } : spring}
         className="ml-auto w-fit rounded-3xl rounded-br-lg bg-primary px-4 py-2.5 text-sm text-primary-foreground"
       >
         Who built this?
       </motion.p>
       <motion.p
-        initial={{ opacity: 0, y: 10 }}
+        initial={reduceMotion ? false : { opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ ...spring, delay: 0.16 }}
+        transition={reduceMotion ? { duration: 0 } : { ...spring, delay: 0.16 }}
         className="font-serif text-[1.05rem] leading-relaxed"
       >
         Genoese merchants, in 1348 — as the crown of their walled colony.
       </motion.p>
       <motion.p
-        initial={{ opacity: 0, x: 12 }}
+        initial={reduceMotion ? false : { opacity: 0, x: 12 }}
         animate={{ opacity: 1, x: 0 }}
-        transition={{ ...spring, delay: 0.3 }}
+        transition={reduceMotion ? { duration: 0 } : { ...spring, delay: 0.3 }}
         className="ml-auto w-fit rounded-3xl rounded-br-lg bg-primary px-4 py-2.5 text-sm text-primary-foreground"
       >
         Can I go up at night?
@@ -147,11 +153,11 @@ export function OnboardingScreen() {
   return (
     <div className="flex min-h-dvh flex-col overflow-hidden bg-background">
       <header className="flex items-center justify-between px-6 safe-top">
-        <p className="display text-lg text-clay">Welcome, {firstName}.</p>
+        <p className="display text-lg text-brand-ink">Welcome, {firstName}.</p>
         <button
           type="button"
           onClick={finish}
-          className="-mr-2 px-2 py-2 text-sm text-muted-foreground transition-colors active:text-foreground"
+          className="-mr-2 inline-flex min-h-11 min-w-11 items-center justify-center px-2 py-2 text-sm text-muted-foreground transition-colors active:text-foreground"
         >
           Skip
         </button>
@@ -185,18 +191,22 @@ export function OnboardingScreen() {
       </motion.div>
 
       <div className="flex items-center justify-between px-6 safe-bottom">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           {SLIDES.map((item, dotIndex) => (
             <button
               key={item.title}
               type="button"
               aria-label={`Slide ${dotIndex + 1}`}
               onClick={() => go(dotIndex)}
-              className={cn(
-                'h-2 rounded-full transition-all duration-300',
-                dotIndex === index ? 'w-7 bg-primary' : 'w-2 bg-border',
-              )}
-            />
+              className="grid min-h-11 min-w-11 place-items-center py-3.5"
+            >
+              <span
+                className={cn(
+                  'block h-2 rounded-full transition-all duration-300',
+                  dotIndex === index ? 'w-7 bg-primary' : 'w-2 bg-border',
+                )}
+              />
+            </button>
           ))}
         </div>
         <button
