@@ -1,6 +1,6 @@
 # Impeccable audit — workstreams
 
-Baseline: `impeccable/baseline` (snapshot of the working tree on 2025-10-21).
+Baseline: `impeccable/baseline` (snapshot of the working tree on 2026-10-21).
 
 How this list was produced:
 
@@ -231,3 +231,50 @@ and landscape fit without clipping; `tsc`/`build:only` pass; `impeccable detect`
    320×568 and 768×1024; re-run `impeccable detect` on `src` and the running app.
 5. Update `DESIGN.md` only if a worker introduced a rule the document does not already state.
 6. Report the diff, the verification evidence, and anything intentionally left out.
+
+---
+
+## Delivered — 2026-10-21
+
+Integration branch: `impeccable/integration`, based on `impeccable/baseline`.
+
+| Workstream | Branch | Commit |
+| --- | --- | --- |
+| WS1 brand | `ispiroglu/impeccable-brand` | `5f7df6c` |
+| WS2 camera | `ispiroglu/impeccable-camera` | `49a511c`, hint fix `2dffb4a` |
+| WS3 report | `ispiroglu/impeccable-report` | `f7a8dd6`, hint fix `a854bc4` |
+| WS4 places | `ispiroglu/impeccable-places` | `a897374` |
+| WS5 onboarding | `ispiroglu/impeccable-onboarding` | `4446565` |
+
+Integration-only commits:
+
+- `dbd786b` — document the full type/photo ramp in `DESIGN.md`; point the brand
+  contact sheet at petrol instead of clay.
+- `3caa577` — one `photoAtWidth` helper in `src/lib/image.ts`, used by the report
+  hero and the history thumbnails.
+- `ea37a6a` — smoke test follows the new place-aware chat placeholder.
+
+Verification:
+
+- `bun run typecheck` (generated Worker types + app/worker/node configs) — pass.
+- `bun run build:only` — pass.
+- `bun run smoke` — 12/12 checks, no console errors.
+- `impeccable detect src index.html` → 0 findings; rendered login → 0 findings.
+- Screenshot tours at 390×844 (light/dark), 320×568, 768×1024 and 1280×800:
+  no horizontal overflow, no console errors. Camera hint and report hint measured
+  against their controls: zero overlap at 390 and 320, and the hints pass taps
+  through.
+- History thumbnails negotiate `160w` / `240w` at `sizes="72px"`; report hero
+  negotiates `640w`–`1600w`.
+
+Intentionally left out / residual:
+
+- At 320×568 the top-left marker on `demo-blue-mosque` overlaps the back button
+  by about 8px. The marker centre stays tappable; this predates the audit and is
+  not one of the findings.
+- The first-run swipe pill is 321.6px wide, so it is clipped by about 0.8px on
+  each side at 320px. It is `pointer-events-none` and lives for six seconds.
+- Playwright uses a fake camera, so camera screenshots are solid green; HUD
+  contrast was judged from layout, edges and measured control boxes.
+- Production is separate from this branch. It currently serves the user's
+  camera-only preview (`49a511c`), not the full integration branch.
