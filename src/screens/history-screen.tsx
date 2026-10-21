@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { photoAtWidth } from '@/lib/image'
 import { staggerContainer, staggerItem } from '@/lib/motion'
 import { useHistory } from '@/hooks/use-history'
+import { useAppStore } from '@/store/app'
 import { cn, formatRelativeDate, groupDay } from '@/lib/utils'
 
 const DAY_RANK: Record<ReturnType<typeof groupDay>, number> = {
@@ -17,10 +18,23 @@ const DAY_RANK: Record<ReturnType<typeof groupDay>, number> = {
   earlier: 3,
 }
 
-export function HistoryScreen({ onOpenCamera }: { onOpenCamera: () => void }) {
+export function HistoryScreen({
+  onOpenCamera,
+  active,
+}: {
+  onOpenCamera: () => void
+  /** False when another panel owns the route, so the page keeps one `h1`. */
+  active?: boolean
+}) {
   const { analyses, loading, error, refresh } = useHistory()
   const [query, setQuery] = useState('')
   const [savedOnly, setSavedOnly] = useState(false)
+  // The deck keeps every panel mounted, so the panel that owns the route must
+  // be the only `h1` on it. The shell may pass `active`; the store is the
+  // fallback so the page never carries two headings of the same level.
+  const panelActive = useAppStore((state) => state.screenIndex === 2)
+  const isActive = active ?? panelActive
+  const Heading = isActive ? 'h1' : 'h2'
 
   const ordered = useMemo(() => {
     const needle = query.trim().toLowerCase()
@@ -39,24 +53,29 @@ export function HistoryScreen({ onOpenCamera }: { onOpenCamera: () => void }) {
   }, [analyses, query, savedOnly])
 
   return (
-    <section className="h-full overflow-y-auto overscroll-contain bg-background pb-28">
+    <section
+      aria-label="Places"
+      className="h-full touch-pan-y overflow-y-auto overscroll-contain bg-background pb-28"
+    >
       <header className="glass sticky top-0 z-10 pb-3 safe-top">
-        <div className="mx-auto w-full max-w-3xl px-5">
+        <div className="mx-auto flex w-full max-w-3xl flex-col px-5 [@media(max-height:480px)]:flex-row [@media(max-height:480px)]:items-center [@media(max-height:480px)]:gap-3">
           <button
             type="button"
             onClick={onOpenCamera}
             aria-label="Open the camera"
-            className="grid size-11 place-items-center rounded-full bg-secondary text-foreground active:scale-[0.97]"
+            className="grid size-11 shrink-0 place-items-center self-end rounded-full bg-secondary text-foreground active:scale-[0.97] [@media(max-height:480px)]:self-auto"
           >
             <Camera className="size-5" />
           </button>
 
-          <h1 className="display mt-4 text-4xl font-medium">History</h1>
+          <Heading className="display mt-4 text-4xl font-medium [@media(max-height:480px)]:mt-0 [@media(max-height:480px)]:min-w-0 [@media(max-height:480px)]:truncate [@media(max-height:480px)]:text-2xl">
+            Places
+          </Heading>
 
-          <div className="mt-4 flex items-center gap-2">
+          <div className="mt-4 flex items-center gap-2 [@media(max-height:480px)]:mt-0 [@media(max-height:480px)]:min-w-0 [@media(max-height:480px)]:flex-1">
             <label
               htmlFor="history-search"
-              className="flex h-11 flex-1 items-center gap-2 rounded-xl bg-secondary px-3 text-muted-foreground focus-within:ring-2 focus-within:ring-ring"
+              className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-xl bg-secondary px-3 text-muted-foreground focus-within:ring-2 focus-within:ring-ring"
             >
               <Search className="size-4 shrink-0" aria-hidden />
               <Input
@@ -64,6 +83,7 @@ export function HistoryScreen({ onOpenCamera }: { onOpenCamera: () => void }) {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search your places"
+                aria-label="Search your places"
                 className="flex-1 rounded-none focus-visible:ring-0 focus-visible:ring-offset-0"
                 data-no-swipe
               />
@@ -72,7 +92,7 @@ export function HistoryScreen({ onOpenCamera }: { onOpenCamera: () => void }) {
               type="button"
               onClick={() => setSavedOnly((value) => !value)}
               aria-pressed={savedOnly}
-              aria-label="Saved places only"
+              aria-label="Show only saved places"
               className={cn(
                 'grid size-11 shrink-0 place-items-center rounded-full transition-colors active:scale-[0.97]',
                 savedOnly
@@ -188,6 +208,7 @@ export function HistoryScreen({ onOpenCamera }: { onOpenCamera: () => void }) {
 
 function HistoryRow({ analysis }: { analysis: Analysis }) {
   const navigate = useNavigate()
+  const [thumbFailed, setThumbFailed] = useState(false)
   const questionCount = analysis.messages.filter((message) => message.role === 'user').length
   const thumb160 = photoAtWidth(analysis.previewUrl, 160)
   const thumb240 = photoAtWidth(analysis.previewUrl, 240)
@@ -211,7 +232,7 @@ function HistoryRow({ analysis }: { analysis: Analysis }) {
         aria-label={label}
         className="flex w-full items-center gap-4 rounded-2xl p-2 text-left transition-colors active:bg-secondary"
       >
-        {analysis.previewUrl ? (
+        {analysis.previewUrl && !thumbFailed ? (
           <img
             src={thumb}
             srcSet={thumbSrcSet}
@@ -221,11 +242,13 @@ function HistoryRow({ analysis }: { analysis: Analysis }) {
             alt=""
             loading="lazy"
             decoding="async"
+            onError={() => setThumbFailed(true)}
             className="size-[4.5rem] shrink-0 rounded-xl bg-secondary object-cover"
           />
         ) : (
+          // A failed photo is a quiet tile, never the browser's broken-image glyph.
           <div className="grid size-[4.5rem] shrink-0 place-items-center rounded-xl bg-secondary">
-            <Camera className="size-5 text-muted-foreground" />
+            <Camera className="size-3 text-muted-foreground" />
           </div>
         )}
 
