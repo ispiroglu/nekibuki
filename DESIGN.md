@@ -13,6 +13,10 @@ colors:
   brand-fg: "#f2fbf8"
   hud: "#6cc0b0"
   hud-fg: "#141413"
+  photo-ink: "#ffffff"
+  photo-shadow: "rgba(0, 0, 0, 0.4)"
+  photo-shadow-soft: "rgba(0, 0, 0, 0.35)"
+  mask-stencil: "#000000"
   destructive: "#c4472f"
   dark-paper: "#1f1e1d"
   dark-surface: "#2a2927"
@@ -39,6 +43,26 @@ typography:
     fontSize: "0.75rem"
     fontWeight: 500
     letterSpacing: "0.06em"
+  meta:
+    fontFamily: "system-ui, -apple-system, SF Pro Text, Segoe UI, Roboto, Helvetica Neue, sans-serif"
+    fontSize: "0.7rem"
+    fontWeight: 500
+    letterSpacing: "0.06em"
+  ui:
+    fontFamily: "system-ui, -apple-system, SF Pro Text, Segoe UI, Roboto, Helvetica Neue, sans-serif"
+    fontSize: "13px"
+    fontWeight: 500
+    lineHeight: 1.2
+  list:
+    fontFamily: "system-ui, -apple-system, SF Pro Text, Segoe UI, Roboto, Helvetica Neue, sans-serif"
+    fontSize: "15px"
+    fontWeight: 400
+    lineHeight: 1.4
+  lede:
+    fontFamily: "Newsreader Variable, ui-serif, Georgia, serif"
+    fontSize: "1.375rem"
+    fontWeight: 400
+    lineHeight: 1.55
 rounded:
   sm: "8.4px"
   md: "11.2px"
@@ -112,6 +136,9 @@ One hue, three jobs. The accent is a signature, not a theme.
   chromatic than the brand ink because they must survive arbitrary photography.
 - Active photo markers pair the HUD fill with a 2px `rgb(0 0 0 / 0.25)` ring. Without it, a pale
   marker disappears against a bright sky.
+- Text sitting directly on a photograph uses `photo-ink` with a two-layer `photo-shadow`
+  (`0 1px 2px` and `0 8px 30px`) so it survives both bright skies and dark façades. The
+  `mask-stencil` black is a compositing stencil for fade masks, never a visible colour.
 
 ### Named Rules
 **The One Hue Rule.** There is one chromatic accent. Destructive red is the only other saturated
@@ -140,15 +167,20 @@ while the controls feel native.
 - **Reading** (400, 1.0625rem, 1.7): report prose and guide answers. Keep line length 55–70ch;
   never wider than 34rem for a measure.
 - **Body** (400, 1rem, 1.5): controls, metadata, list rows.
-- **Label** (500, 0.75rem, 0.06em, uppercase): group headings and eyebrow labels. Never smaller
-  than 0.7rem (11.2px); the current onboarding 0.6rem is below the floor.
+- **Label** (500, 0.75rem, 0.06em, uppercase): group headings and eyebrow labels.
+- **Meta** (500, 0.7rem, 0.06em, uppercase): the smallest allowed step, for dense metadata
+  inside a card or a report header. Never smaller than 0.7rem (11.2px); the old onboarding
+  0.6rem was below the floor.
+- **UI** (500, 13px, 1.2): buttons, segmented controls, compact chips.
+- **List** (400, 15px, 1.4): settings and history row titles.
+- **Lede** (400, 1.375rem, 1.55): the report introduction, between Reading and Headline.
 
 ### Named Rules
 **The Two-Voice Rule.** Serif is for content; sans is for chrome. A button label never uses the
 serif, and a report paragraph never uses the sans.
 
-**The 12px Floor Rule.** Uppercase labels never go below 12px. If a label must be smaller to fit,
-the layout is wrong.
+**The 0.7rem Floor Rule.** Uppercase labels never go below 0.7rem (11.2px); use 12px where the
+layout allows. If a label must be smaller to fit, the layout is wrong.
 
 ## Layout
 
@@ -212,7 +244,7 @@ same surface — that is the "AI card" tell.
 - Use the serif for reading and the sans for operating.
 - Reserve brand green for moments that point at something: the logo, a numbered dot, a send arrow.
 - Use the HUD tokens for anything drawn over a photo, including the viewfinder.
-- Keep labels at 12px or larger and body text at 16px or larger.
+- Keep labels at 11.2px or larger (12px where space allows) and body text at 16px or larger.
 - Verify contrast before shipping: 4.5:1 for text, 3:1 for UI and focus rings.
 
 **Don't**

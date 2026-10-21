@@ -13,7 +13,7 @@ const outDir =
   process.env.SHOT_DIR ??
   '/private/var/folders/5y/j78v7y957cd228wlrx_ds47r0000gn/T/nekibuki-brand-lab'
 
-const BRANDS = ['clay', 'okra', 'petrol', 'lapis', 'saffron']
+const BRANDS = ['petrol', 'clay', 'okra', 'lapis', 'saffron']
 
 await mkdir(outDir, { recursive: true })
 
@@ -49,7 +49,7 @@ const wait = (ms) => page.waitForTimeout(ms)
 const setBrand = async (brand) => {
   await page.evaluate((value) => {
     localStorage.setItem('nekibuki.brand', value)
-    if (value === 'clay') delete document.documentElement.dataset.brand
+    if (value === 'petrol') delete document.documentElement.dataset.brand
     else document.documentElement.dataset.brand = value
   }, brand)
   await wait(450)
@@ -70,7 +70,7 @@ for (const brand of BRANDS) {
 }
 
 // ------------------------------------------------------- get into the camera once
-await setBrand('clay')
+await setBrand('petrol')
 await page.getByRole('button', { name: /Continue with Google/i }).click()
 await wait(1100)
 
@@ -80,7 +80,7 @@ for (const brand of BRANDS) {
   await shot(`02-onboarding-${brand}`)
 }
 
-await setBrand('clay')
+await setBrand('petrol')
 for (let step = 0; step < 2; step += 1) {
   await page.getByRole('button', { name: /Continue/i }).click()
   await wait(800)
