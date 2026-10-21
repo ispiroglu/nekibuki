@@ -2,6 +2,7 @@ import type { VisualReference } from '@shared/types'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { X } from 'lucide-react'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { photoSrcSet } from '@/lib/image'
 import { cn } from '@/lib/utils'
 
 /**
@@ -10,6 +11,9 @@ import { cn } from '@/lib/utils'
  * article rises over the bottom of the frame.
  */
 const MARKER_BAND = 0.72
+
+const FOCUSABLE =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
 export function PhotoHero({
   imageUrl,
@@ -21,10 +25,14 @@ export function PhotoHero({
   const [activeId, setActiveId] = useState<string | null>(null)
   const [hintVisible, setHintVisible] = useState(true)
   const markerRef = useRef<HTMLButtonElement | null>(null)
+  const panelRef = useRef<HTMLDivElement | null>(null)
+  const closeRef = useRef<HTMLButtonElement | null>(null)
   const reduceMotion = useReducedMotion()
   const detailId = useId()
   const detailTitleId = useId()
+  const detailBodyId = useId()
   const active = references.find((reference) => reference.id === activeId) ?? null
+  const srcSet = photoSrcSet(imageUrl)
 
   const close = useCallback(() => {
     setActiveId(null)
@@ -37,24 +45,68 @@ export function PhotoHero({
     return () => window.clearTimeout(timer)
   }, [])
 
+  // The panel is a real modal: lock the page, move focus into it, trap Tab,
+  // close on Escape, and hand focus back to the marker that opened it.
   useEffect(() => {
-    if (!active) return
+    if (!activeId) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const timer = window.setTimeout(() => {
+      closeRef.current?.focus({ preventScroll: true })
+    }, 60)
+
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        event.preventDefault()
         event.stopPropagation()
         close()
+        return
+      }
+      if (event.key !== 'Tab') return
+      const panel = panelRef.current
+      if (!panel) return
+      const focusable = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+        (element) => element.offsetParent !== null || element === panel,
+      )
+      if (focusable.length === 0) {
+        event.preventDefault()
+        panel.focus({ preventScroll: true })
+        return
+      }
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      const current = document.activeElement
+      if (!panel.contains(current)) {
+        event.preventDefault()
+        first.focus()
+      } else if (event.shiftKey && (current === first || current === panel)) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && current === last) {
+        event.preventDefault()
+        first.focus()
       }
     }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [active, close])
+
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.clearTimeout(timer)
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [activeId, close])
 
   return (
     <>
       <div className="relative h-[60svh] min-h-[420px] w-full overflow-hidden bg-secondary">
         <img
           src={imageUrl}
+          srcSet={srcSet}
+          sizes="100vw"
           alt=""
+          width={1600}
+          height={1200}
+          fetchPriority="high"
           decoding="async"
           className="absolute inset-0 size-full object-cover"
         />
@@ -155,9 +207,13 @@ export function PhotoHero({
           >
             <div
               id={detailId}
+              ref={panelRef}
               role="dialog"
+              aria-modal="true"
               aria-labelledby={detailTitleId}
-              className="mx-auto max-w-md rounded-3xl border border-white/15 bg-black/65 p-4 text-white backdrop-blur-xl"
+              aria-describedby={detailBodyId}
+              tabIndex={-1}
+              className="mx-auto max-w-md rounded-3xl border border-white/15 bg-black/65 p-4 text-white backdrop-blur-xl focus:outline-none"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -167,15 +223,18 @@ export function PhotoHero({
                   </h3>
                 </div>
                 <button
+                  ref={closeRef}
                   type="button"
                   onClick={close}
-                  className="grid size-11 shrink-0 place-items-center rounded-full bg-white/15 text-white"
+                  className="grid size-11 shrink-0 place-items-center rounded-full bg-white/15 text-white transition-transform duration-150 ease-out active:scale-95"
                   aria-label="Close detail"
                 >
                   <X className="size-4" />
                 </button>
               </div>
-              <p className="mt-2 text-sm leading-relaxed text-white/90">{active.body}</p>
+              <p id={detailBodyId} className="mt-2 text-sm leading-relaxed text-white/90">
+                {active.body}
+              </p>
             </div>
           </motion.div>
         )}

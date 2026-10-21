@@ -1,5 +1,38 @@
 /** Photo preparation helpers. Everything here keeps the upload small and pleasant. */
 
+/** Widths offered to the report hero. The stored URL keeps its own crop and quality. */
+export const HERO_PHOTO_WIDTHS = [640, 960, 1280, 1600] as const
+
+/**
+ * Builds a responsive `srcset` for a stored photo URL.
+ *
+ * Only Unsplash URLs are rewritten: captured photos are blob/data URLs, and an
+ * arbitrary host has no contract for a `w` parameter. The original URL is left
+ * untouched, so crop, fit, format and quality params are preserved and the
+ * document CSP (`img-src https://images.unsplash.com`) still holds.
+ */
+export function photoSrcSet(
+  url: string,
+  widths: readonly number[] = HERO_PHOTO_WIDTHS,
+): string | undefined {
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return undefined
+  }
+
+  if (parsed.hostname !== 'images.unsplash.com' || !parsed.searchParams.has('w')) return undefined
+
+  return widths
+    .map((width) => {
+      const variant = new URL(parsed)
+      variant.searchParams.set('w', String(width))
+      return `${variant.toString()} ${width}w`
+    })
+    .join(', ')
+}
+
 const MAX_UPLOAD_EDGE = 1800
 const UPLOAD_QUALITY = 0.86
 const PREVIEW_EDGE = 720

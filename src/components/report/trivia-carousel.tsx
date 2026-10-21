@@ -29,35 +29,26 @@ const ICONS: Record<TriviaIcon, typeof Sparkles> = {
 }
 
 const EDGE_TOLERANCE = 2
+const CAROUSEL_QUERY = '(max-width: 767px)'
 
 export function TriviaCarousel({ trivia }: { trivia: Trivia[] }) {
   const scrollerRef = useRef<HTMLDivElement>(null)
-  const [scroll, setScroll] = useState({ index: 0, atEnd: false })
+  const [atEnd, setAtEnd] = useState(false)
+  const [isCarousel, setIsCarousel] = useState(true)
 
-  /** The visible card is whichever one sits nearest the row's left content edge. */
+  useEffect(() => {
+    const media = window.matchMedia(CAROUSEL_QUERY)
+    const sync = () => setIsCarousel(media.matches)
+    sync()
+    media.addEventListener('change', sync)
+    return () => media.removeEventListener('change', sync)
+  }, [])
+
+  /** The right-edge fade disappears once the row has nothing left to reveal. */
   const syncScroll = useCallback(() => {
     const scroller = scrollerRef.current
     if (!scroller) return
-    const cards = Array.from(scroller.children) as HTMLElement[]
-    if (cards.length === 0) return
-
-    const paddingLeft = Number.parseFloat(window.getComputedStyle(scroller).paddingLeft) || 0
-    const origin = scroller.getBoundingClientRect().left + paddingLeft
-    let index = 0
-    let nearest = Number.POSITIVE_INFINITY
-    cards.forEach((card, cardIndex) => {
-      const distance = Math.abs(card.getBoundingClientRect().left - origin)
-      if (distance < nearest) {
-        nearest = distance
-        index = cardIndex
-      }
-    })
-
-    const atEnd =
-      scroller.scrollLeft >= scroller.scrollWidth - scroller.clientWidth - EDGE_TOLERANCE
-    setScroll((current) =>
-      current.index === index && current.atEnd === atEnd ? current : { index, atEnd },
-    )
+    setAtEnd(scroller.scrollLeft >= scroller.scrollWidth - scroller.clientWidth - EDGE_TOLERANCE)
   }, [])
 
   useEffect(() => {
@@ -74,6 +65,7 @@ export function TriviaCarousel({ trivia }: { trivia: Trivia[] }) {
         tabIndex={0}
         role="region"
         aria-label="Trivia cards"
+        aria-roledescription={isCarousel ? 'carousel' : undefined}
         className="-mx-6 flex snap-row gap-3 overflow-x-auto overscroll-x-contain scroll-px-6 px-6 pb-2 no-scrollbar md:mx-0 md:grid md:grid-cols-2 md:overflow-visible md:px-0"
       >
         {trivia.map((item, index) => {
@@ -88,8 +80,8 @@ export function TriviaCarousel({ trivia }: { trivia: Trivia[] }) {
                 <span className="grid size-8 place-items-center rounded-lg bg-secondary text-foreground/80">
                   <Icon className="size-4" strokeWidth={1.9} />
                 </span>
-                <span className="font-serif text-2xl leading-none text-muted-foreground/45 tabular-nums">
-                  {index + 1}
+                <span className="pt-1.5 text-xs font-medium text-muted-foreground tabular-nums">
+                  {index + 1} of {trivia.length}
                 </span>
               </div>
               <p className="label-caps mt-4 text-muted-foreground">{item.label}</p>
@@ -103,15 +95,9 @@ export function TriviaCarousel({ trivia }: { trivia: Trivia[] }) {
       <div
         aria-hidden
         className={`pointer-events-none absolute inset-y-0 -right-6 w-16 bg-gradient-to-l from-background via-background/70 to-transparent md:hidden ${
-          scroll.atEnd ? 'opacity-0' : 'opacity-100'
+          atEnd ? 'opacity-0' : 'opacity-100'
         }`}
       />
-
-      {trivia.length > 1 && (
-        <p className="mt-1.5 text-right text-xs text-muted-foreground tabular-nums md:hidden">
-          <span className="text-foreground/70">{scroll.index + 1}</span> / {trivia.length}
-        </p>
-      )}
     </div>
   )
 }
