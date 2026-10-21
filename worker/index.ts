@@ -2,15 +2,75 @@ import { chatRequestSchema, geoPointSchema } from '@shared/schema'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
-import type { GuideLanguage } from '@shared/types'
+import type { AttractionReport, GuideLanguage } from '@shared/types'
 import { GeminiProvider } from './services/gemini'
 import { MockVisionProvider } from './services/mock'
-import { ProviderError, type AppEnv, type VisionProvider } from './types'
+import { ProviderError, type AppEnv, type VisionInput, type VisionProvider } from './types'
 
 const app = new Hono<{ Bindings: AppEnv }>()
 
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'])
+
+/**
+ * Stable, machine-readable error codes. The client switches on `code`, never on
+ * the message: an expired session and a dead network are different failures
+ * and the traveller needs a different next step for each.
+ */
+export type ApiErrorCode =
+  | 'session_expired'
+  | 'bad_request'
+  | 'payload_too_large'
+  | 'unsupported_media_type'
+  | 'not_found'
+  | 'method_not_allowed'
+  | 'rate_limited'
+  | 'missing_key'
+  | 'invalid_key'
+  | 'network_error'
+  | 'blocked'
+  | 'empty_response'
+  | 'invalid_json'
+  | 'invalid_report'
+  | 'provider_error'
+  | 'analysis_failed'
+  | 'chat_failed'
+  | 'internal'
+
+/** Codes implied by the HTTP status of a plain `HTTPException`. */
+const STATUS_ERROR_CODES: Partial<Record<number, ApiErrorCode>> = {
+  400: 'bad_request',
+  401: 'session_expired',
+  404: 'not_found',
+  405: 'method_not_allowed',
+  413: 'payload_too_large',
+  415: 'unsupported_media_type',
+  429: 'rate_limited',
+  502: 'network_error',
+  503: 'network_error',
+  504: 'network_error',
+}
+
+/** Codes the vision provider is allowed to report. Anything else is internal. */
+const PROVIDER_ERROR_CODES = new Set<ApiErrorCode>([
+  'missing_key',
+  'invalid_key',
+  'rate_limited',
+  'network_error',
+  'blocked',
+  'empty_response',
+  'invalid_json',
+  'invalid_report',
+  'provider_error',
+])
+
+function codeForStatus(status: number): ApiErrorCode {
+  return STATUS_ERROR_CODES[status] ?? 'internal'
+}
+
+function codeForProvider(code: string): ApiErrorCode {
+  return PROVIDER_ERROR_CODES.has(code as ApiErrorCode) ? (code as ApiErrorCode) : 'internal'
+}
 
 function providerFor(env: AppEnv): VisionProvider {
   const configured = (env.VISION_PROVIDER as string | undefined)?.toLowerCase()
@@ -42,7 +102,13 @@ async function requireUser(env: AppEnv, authorization: string | undefined): Prom
       apikey: env.SUPABASE_ANON_KEY,
       authorization,
     },
-  })
+  }).catch(() => null)
+
+  if (!response) {
+    // The session could not be checked at all: that is a network failure, not
+    // an expired session, and the traveller should not be asked to sign in.
+    throw new HTTPException(503, { message: 'Could not confirm your session right now. Try again.' })
+  }
 
   if (!response.ok) {
     throw new HTTPException(401, { message: 'Your session expired. Sign in again.' })
@@ -51,6 +117,50 @@ async function requireUser(env: AppEnv, authorization: string | undefined): Prom
 
 function languageFrom(value: FormDataEntryValue | null): GuideLanguage {
   return value === 'tr' ? 'tr' : 'en'
+}
+
+/**
+ * A failed analysis is never a silent failure: the provider's own code and
+ * message survive, and anything else becomes an actionable `analysis_failed`.
+ */
+async function analyzeWith(provider: VisionProvider, input: VisionInput): Promise<AttractionReport> {
+  try {
+    return await provider.analyze(input)
+  } catch (error) {
+    if (error instanceof ProviderError) throw error
+    console.error(
+      JSON.stringify({
+        level: 'error',
+        message: 'Vision analysis failed',
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    )
+    throw new ProviderError(
+      'The guide could not read that photo. Try again in a moment.',
+      'analysis_failed',
+      502,
+    )
+  }
+}
+
+/** The same contract for the guide's answer: a named code, an actionable message. */
+async function chatWith(
+  provider: VisionProvider,
+  input: Parameters<VisionProvider['chat']>[0],
+): Promise<string> {
+  try {
+    return await provider.chat(input)
+  } catch (error) {
+    if (error instanceof ProviderError) throw error
+    console.error(
+      JSON.stringify({
+        level: 'error',
+        message: 'Guide answer failed',
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    )
+    throw new ProviderError('The guide could not answer that. Try again in a moment.', 'chat_failed', 502)
+  }
 }
 
 app.get('/api/health', (c) =>
@@ -70,7 +180,12 @@ app.post('/api/analyze', async (c) => {
     throw new HTTPException(415, { message: 'Send the photo as multipart/form-data.' })
   }
 
-  const form = await c.req.formData()
+  let form: FormData
+  try {
+    form = await c.req.formData()
+  } catch {
+    throw new HTTPException(400, { message: 'Send the photo as multipart/form-data.' })
+  }
   const image = form.get('image')
 
   if (!(image instanceof File)) {
@@ -97,7 +212,7 @@ app.post('/api/analyze', async (c) => {
   const language = languageFrom(form.get('language'))
   const provider = providerFor(c.env)
   const started = Date.now()
-  const report = await provider.analyze({
+  const report = await analyzeWith(provider, {
     image: await image.arrayBuffer(),
     mimeType: image.type,
     location,
@@ -129,7 +244,7 @@ app.post('/api/chat', async (c) => {
 
   const provider = providerFor(c.env)
   const { report, messages, question, language } = parsed.data
-  const answer = await provider.chat({
+  const answer = await chatWith(provider, {
     report,
     history: messages.map((message) => ({ role: message.role, content: message.content })),
     question,
@@ -139,15 +254,18 @@ app.post('/api/chat', async (c) => {
   return c.json({ answer, provider: provider.name }, 200, { 'cache-control': 'no-store' })
 })
 
-app.notFound((c) => c.json({ error: 'Not found' }, 404))
+app.notFound((c) => c.json({ error: 'Not found', code: 'not_found' }, 404))
 
 app.onError((error, c) => {
   if (error instanceof HTTPException) {
-    return c.json({ error: error.message }, error.status as ContentfulStatusCode)
+    return c.json(
+      { error: error.message, code: codeForStatus(error.status) },
+      error.status as ContentfulStatusCode,
+    )
   }
   if (error instanceof ProviderError) {
     return c.json(
-      { error: error.message, code: error.code },
+      { error: error.message, code: codeForProvider(error.code) },
       error.status as ContentfulStatusCode,
     )
   }
@@ -159,7 +277,7 @@ app.onError((error, c) => {
       stack: error instanceof Error ? error.stack : undefined,
     }),
   )
-  return c.json({ error: 'Something went wrong. Please try again.' }, 500)
+  return c.json({ error: 'Something went wrong. Please try again.', code: 'internal' }, 500)
 })
 
 export default app

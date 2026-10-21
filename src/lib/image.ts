@@ -1,5 +1,8 @@
 /** Photo preparation helpers. Everything here keeps the upload small and pleasant. */
 
+import { useCallback, useState } from 'react'
+import { cn } from './utils'
+
 /** Widths offered to the report hero. The stored URL keeps its own crop and quality. */
 export const HERO_PHOTO_WIDTHS = [640, 960, 1280, 1600] as const
 
@@ -237,6 +240,73 @@ export function captureVideoStill(
     return canvas.toDataURL('image/jpeg', quality)
   } catch {
     return null
+  }
+}
+
+/*
+ * The photo fallback recipe, shared by every surface that shows a photograph:
+ * a muted surface (`bg-secondary` — the DESIGN.md "Muted Surface" token,
+ * #f0eee6 by day and #30302e at night, the same colour as `bg-muted`)
+ * carrying a 12px muted caption or glyph — never the browser's broken-image
+ * glyph.
+ */
+
+/** The muted surface that stands in for a photo that cannot be fetched. */
+export const PHOTO_FALLBACK_SURFACE_CLASS = 'bg-secondary'
+
+/** The 12px muted caption that sits inside the fallback surface. */
+export const PHOTO_FALLBACK_CAPTION_CLASS = 'text-xs text-muted-foreground'
+
+const DEFAULT_FALLBACK_CAPTION = 'Photo unavailable'
+
+export interface PhotoFallbackOptions {
+  /** Description of the photo. It stays the image's alt and becomes the caption. */
+  alt?: string
+  /** Classes merged onto the `<img>`. */
+  className?: string
+}
+
+export interface PhotoFallback {
+  /** True once the photo has failed to load. */
+  isFailed: boolean
+  /** Props to spread onto the `<img>`. */
+  imgProps: {
+    onError: () => void
+    alt: string
+    'aria-hidden': true | undefined
+    className: string
+  }
+  /** Classes for the muted surface that replaces the missing photo. Add the
+   * photo's own size and radius to it. */
+  surfaceClassName: string
+  /** Classes for the 12px muted caption inside that surface. */
+  captionClassName: string
+  /** The caption to read when the photo is missing. */
+  caption: string
+}
+
+/**
+ * The shared photo-failure pattern: hide the broken `<img>` and show the muted
+ * surface with a 12px muted caption instead of the browser's broken-image
+ * glyph. The alt text stays put, so the description never changes with the
+ * state, and the caption carries the same words for assistive technology.
+ */
+export function usePhotoFallback(options: PhotoFallbackOptions = {}): PhotoFallback {
+  const [isFailed, setIsFailed] = useState(false)
+  const onError = useCallback(() => setIsFailed(true), [])
+  const alt = options.alt ?? ''
+
+  return {
+    isFailed,
+    imgProps: {
+      onError,
+      alt,
+      'aria-hidden': isFailed ? true : undefined,
+      className: cn(options.className, isFailed && 'hidden'),
+    },
+    surfaceClassName: PHOTO_FALLBACK_SURFACE_CLASS,
+    captionClassName: PHOTO_FALLBACK_CAPTION_CLASS,
+    caption: alt.trim() ? alt : DEFAULT_FALLBACK_CAPTION,
   }
 }
 
