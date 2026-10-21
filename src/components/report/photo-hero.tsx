@@ -12,6 +12,11 @@ import { cn } from '@/lib/utils'
  */
 const MARKER_BAND = 0.72
 
+/** Half a 44px marker target plus an 8px gap: the hint starts below the lowest dot. */
+const HINT_MARKER_CLEARANCE = 30
+
+const HINT_TIMEOUT_MS = 5000
+
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
@@ -33,6 +38,9 @@ export function PhotoHero({
   const detailBodyId = useId()
   const active = references.find((reference) => reference.id === activeId) ?? null
   const srcSet = photoSrcSet(imageUrl)
+  const lowestMarker = references.reduce((lowest, reference) => Math.max(lowest, reference.y), 0)
+  // Sit below every dot so the hint never masks one, whatever the report's markers are.
+  const hintTop = `calc(${(lowestMarker * MARKER_BAND * 100).toFixed(2)}% + ${HINT_MARKER_CLEARANCE}px)`
 
   const close = useCallback(() => {
     setActiveId(null)
@@ -41,7 +49,7 @@ export function PhotoHero({
   }, [])
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setHintVisible(false), 7000)
+    const timer = window.setTimeout(() => setHintVisible(false), HINT_TIMEOUT_MS)
     return () => window.clearTimeout(timer)
   }, [])
 
@@ -168,12 +176,13 @@ export function PhotoHero({
         })}
 
         <AnimatePresence>
-          {hintVisible && !active && (
+          {hintVisible && !active && references.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
-              className="glass-dark absolute left-1/2 top-20 -translate-x-1/2 rounded-full px-3.5 py-1.5 text-xs font-medium whitespace-nowrap text-white"
+              style={{ top: hintTop }}
+              className="glass-dark pointer-events-none absolute left-1/2 z-20 -translate-x-1/2 rounded-full px-3.5 py-1 text-xs font-medium whitespace-nowrap text-white"
             >
               Tap the dots on your photo
             </motion.div>
