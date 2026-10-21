@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import { photoAtWidth } from '@/lib/image'
 import { staggerContainer, staggerItem } from '@/lib/motion'
 import { useHistory } from '@/hooks/use-history'
 import { cn, formatRelativeDate, groupDay } from '@/lib/utils'
@@ -14,23 +15,6 @@ const DAY_RANK: Record<ReturnType<typeof groupDay>, number> = {
   yesterday: 1,
   week: 2,
   earlier: 3,
-}
-
-/**
- * History rows render a 72px square, but the guide stores the full-size photo.
- * Unsplash serves any width from the same photo id, so ask for a thumbnail when
- * the URL is width-parameterised. Blob URLs from local captures are untouched.
- */
-function thumbUrl(url: string, width: number) {
-  if (!/^https?:\/\//.test(url)) return url
-  try {
-    const parsed = new URL(url)
-    if (!parsed.searchParams.has('w')) return url
-    parsed.searchParams.set('w', String(width))
-    return parsed.toString()
-  } catch {
-    return url
-  }
 }
 
 export function HistoryScreen({ onOpenCamera }: { onOpenCamera: () => void }) {
@@ -205,8 +189,10 @@ export function HistoryScreen({ onOpenCamera }: { onOpenCamera: () => void }) {
 function HistoryRow({ analysis }: { analysis: Analysis }) {
   const navigate = useNavigate()
   const questionCount = analysis.messages.filter((message) => message.role === 'user').length
-  const thumb = thumbUrl(analysis.previewUrl, 240)
-  const resized = thumb !== analysis.previewUrl
+  const thumb160 = photoAtWidth(analysis.previewUrl, 160)
+  const thumb240 = photoAtWidth(analysis.previewUrl, 240)
+  const thumb = thumb240 ?? analysis.previewUrl
+  const thumbSrcSet = thumb160 && thumb240 ? `${thumb160} 160w, ${thumb240} 240w` : undefined
   const label = [
     analysis.report.title,
     analysis.saved && 'saved',
@@ -228,8 +214,8 @@ function HistoryRow({ analysis }: { analysis: Analysis }) {
         {analysis.previewUrl ? (
           <img
             src={thumb}
-            srcSet={resized ? `${thumbUrl(analysis.previewUrl, 160)} 160w, ${thumb} 240w` : undefined}
-            sizes={resized ? '72px' : undefined}
+            srcSet={thumbSrcSet}
+            sizes={thumbSrcSet ? '72px' : undefined}
             width={72}
             height={72}
             alt=""
