@@ -11,7 +11,7 @@ import {
   Trash2,
   TriangleAlert,
 } from 'lucide-react'
-import { Suspense, lazy, useEffect, useState } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { PhotoHero } from '@/components/report/photo-hero'
@@ -38,6 +38,14 @@ const ChatPanel = lazy(() =>
   import('@/components/report/chat-panel').then((module) => ({ default: module.ChatPanel })),
 )
 
+/** How far the article rises over the bottom of the photograph, in px. */
+const PHOTO_OVERLAP = 96
+/**
+ * On a short screen the article starts higher, so the place name and the first
+ * lines of the summary share the first screen with the photo.
+ */
+const PHOTO_OVERLAP_SHORT = 128
+
 export function ReportScreen() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -49,6 +57,31 @@ export function ReportScreen() {
   const [chatOpen, setChatOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [savingSaved, setSavingSaved] = useState(false)
+  const headerRef = useRef<HTMLDivElement>(null)
+  const [headerInset, setHeaderInset] = useState(56)
+  const [shortScreen, setShortScreen] = useState(false)
+
+  // The photo's markers are placed below the floating actions, so the report
+  // measures the bar instead of guessing its height at a given text size.
+  useEffect(() => {
+    const element = headerRef.current
+    if (!element) return
+    const update = () => setHeaderInset(Math.round(element.getBoundingClientRect().height))
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [analysis])
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-height: 480px)')
+    const sync = () => setShortScreen(media.matches)
+    sync()
+    media.addEventListener('change', sync)
+    return () => media.removeEventListener('change', sync)
+  }, [])
+
+  const photoOverlap = shortScreen ? PHOTO_OVERLAP_SHORT : PHOTO_OVERLAP
 
   const goBack = () => {
     if (window.history.length > 1) navigate(-1)
@@ -130,7 +163,7 @@ export function ReportScreen() {
   if (loading) {
     return (
       <div className="min-h-dvh bg-background">
-        <Skeleton className="h-[60svh] min-h-[420px] w-full rounded-none" />
+        <Skeleton className="h-[60svh] min-h-[min(420px,60svh)] w-full rounded-none [@media(max-height:480px)]:h-[70svh]" />
         <div className="absolute inset-x-0 top-0 z-30 flex items-center px-4 safe-top">
           <button
             type="button"
@@ -207,25 +240,34 @@ export function ReportScreen() {
 
   return (
     <div className="min-h-dvh bg-background">
-      <PhotoHero imageUrl={analysis.imageUrl} references={report.visualReferences} />
+      <PhotoHero
+        imageUrl={analysis.imageUrl}
+        references={report.visualReferences}
+        alt={`${report.title}, ${report.location.name}, ${report.location.country}`}
+        topInset={headerInset}
+        bottomInset={photoOverlap}
+      />
 
-      <div className="absolute inset-x-0 top-0 z-30 flex items-center justify-between px-4 safe-top">
+      <div
+        ref={headerRef}
+        className="absolute inset-x-0 top-0 z-30 flex items-center justify-between px-4 safe-top"
+      >
         <button
           type="button"
           onClick={goBack}
-          className="glass-dark grid size-11 place-items-center rounded-full text-white transition-transform duration-150 ease-out active:scale-95"
+          className="glass-dark grid size-[44px] place-items-center rounded-full text-white transition-transform duration-150 ease-out active:scale-95"
           aria-label="Back"
         >
           <ChevronLeft className="size-5" />
         </button>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-[6px]">
           <button
             type="button"
             onClick={() => void toggleSaved()}
             disabled={savingSaved}
             aria-pressed={analysis.saved}
             className={cn(
-              'glass-dark grid size-11 place-items-center rounded-full transition-transform duration-150 ease-out active:scale-95 disabled:opacity-60',
+              'glass-dark grid size-[44px] place-items-center rounded-full transition-transform duration-150 ease-out active:scale-95 disabled:opacity-60',
               analysis.saved ? 'text-hud' : 'text-white',
             )}
             aria-label={analysis.saved ? 'Remove from saved' : 'Save'}
@@ -235,7 +277,7 @@ export function ReportScreen() {
           <button
             type="button"
             onClick={() => void share()}
-            className="glass-dark grid size-11 place-items-center rounded-full text-white transition-transform duration-150 ease-out active:scale-95"
+            className="glass-dark grid size-[44px] place-items-center rounded-full text-white transition-transform duration-150 ease-out active:scale-95"
             aria-label="Share"
           >
             <Share2 className="size-[18px]" />
@@ -243,7 +285,7 @@ export function ReportScreen() {
           <button
             type="button"
             onClick={() => setConfirmDelete(true)}
-            className="glass-dark grid size-11 place-items-center rounded-full text-white transition-transform duration-150 ease-out active:scale-95"
+            className="glass-dark grid size-[44px] place-items-center rounded-full text-white transition-transform duration-150 ease-out active:scale-95"
             aria-label="Delete"
           >
             <Trash2 className="size-[18px]" />
@@ -255,44 +297,40 @@ export function ReportScreen() {
         variants={reduceMotion ? undefined : staggerContainer}
         initial={reduceMotion ? false : 'initial'}
         animate="animate"
-        className="relative mx-auto -mt-24 w-full max-w-[42rem] px-6 pb-36 select-text md:px-8"
+        style={{ marginTop: -photoOverlap }}
+        className="relative mx-auto w-full max-w-[42rem] px-6 pb-36 select-text max-[399px]:px-5 max-[359px]:px-4 md:px-8"
       >
-        <motion.span
-          variants={reduceMotion ? undefined : staggerItem}
-          className="inline-flex items-center gap-1.5 rounded-full bg-brand/15 px-3 py-1 text-xs font-medium text-brand-ink"
-        >
-          <Sparkles className="size-3" />
-          {report.kind}
-        </motion.span>
-
         <motion.h1
           variants={reduceMotion ? undefined : staggerItem}
-          className="display mt-3 text-5xl font-medium"
+          className="display mt-3 text-[clamp(2rem,10vw,3rem)] font-medium break-words [hyphens:auto]"
         >
           {report.title}
         </motion.h1>
 
         <motion.div
           variants={reduceMotion ? undefined : staggerItem}
-          className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm text-muted-foreground"
+          className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-list text-muted-foreground"
         >
           <span className="inline-flex items-center gap-1.5">
             <MapPin className="size-3.5" aria-hidden />
             {report.location.name}, {report.location.country}
           </span>
-          <span aria-hidden className="text-border">
-            ·
+          <span>
+            {report.era} <span aria-hidden>·</span> {confidenceLabel}
           </span>
-          <span>{report.era}</span>
-          <span aria-hidden className="text-border">
-            ·
-          </span>
-          <span className="whitespace-nowrap">{confidenceLabel}</span>
         </motion.div>
+
+        <motion.span
+          variants={reduceMotion ? undefined : staggerItem}
+          className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-label font-medium text-brand-ink"
+        >
+          <Sparkles className="size-3" />
+          {report.kind}
+        </motion.span>
 
         <motion.p
           variants={reduceMotion ? undefined : staggerItem}
-          className="mt-6 font-serif text-[1.375rem] leading-[1.55]"
+          className="mt-6 font-serif text-lede leading-[1.55] [text-wrap:pretty] max-[399px]:text-value [@media(max-height:480px)]:mt-4"
         >
           {report.summary}
         </motion.p>
@@ -303,10 +341,10 @@ export function ReportScreen() {
         >
           {report.quickFacts.map((fact) => (
             <div key={fact.label} className="min-w-0 rounded-2xl bg-secondary px-4 py-3">
-              <dt className="text-[0.7rem] font-medium tracking-[0.06em] text-foreground/70 uppercase">
+              <dt className="text-label font-medium tracking-[0.06em] break-words text-foreground/70 uppercase">
                 {fact.label}
               </dt>
-              <dd className="mt-0.5 min-w-0 font-serif text-lg leading-snug break-words">
+              <dd className="mt-0.5 min-w-0 font-serif text-value leading-snug break-words">
                 {fact.value}
               </dd>
             </div>
@@ -314,23 +352,28 @@ export function ReportScreen() {
         </motion.dl>
 
         <motion.section variants={reduceMotion ? undefined : staggerItem} className="mt-10">
-          <h2 className="text-2xl font-medium tracking-[-0.01em]">Things most people miss</h2>
+          <h2 className="text-title font-medium tracking-[-0.01em]">Things most people miss</h2>
           <div className="mt-4">
             <TriviaCarousel trivia={report.trivia} />
           </div>
         </motion.section>
 
         <motion.section variants={reduceMotion ? undefined : staggerItem} className="mt-10">
-          <h2 className="text-2xl font-medium tracking-[-0.01em]">What you are looking at</h2>
+          <h2 className="text-title font-medium tracking-[-0.01em]">What you are looking at</h2>
           <ol className="mt-4 space-y-4">
             {report.visualReferences.map((reference, index) => (
-              <li key={reference.id} className="flex gap-3">
+              <li
+                key={reference.id}
+                id={`reference-${reference.id}`}
+                tabIndex={-1}
+                className="flex gap-3"
+              >
                 <span className="mt-0 grid size-7 shrink-0 place-items-center rounded-full bg-brand text-xs font-semibold text-brand-fg tabular-nums">
                   {index + 1}
                 </span>
-                <div className="min-w-0">
-                  <h3 className="font-serif text-xl leading-snug break-words">{reference.title}</h3>
-                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                <div className="min-w-0 max-w-[32rem]">
+                  <h3 className="font-serif text-headline leading-snug break-words">{reference.title}</h3>
+                  <p className="mt-1 font-serif text-reading leading-relaxed text-muted-foreground [text-wrap:pretty]">
                     {reference.body}
                   </p>
                 </div>
@@ -340,16 +383,16 @@ export function ReportScreen() {
         </motion.section>
 
         <motion.section variants={reduceMotion ? undefined : staggerItem} className="mt-10">
-          <h2 className="text-2xl font-medium tracking-[-0.01em]">A closer look</h2>
+          <h2 className="text-title font-medium tracking-[-0.01em]">A closer look</h2>
           <div className="mt-5 space-y-7">
             {report.sections.map((section) => (
               <article key={section.id}>
-                <h3 className="text-xl font-medium leading-snug">{section.title}</h3>
-                <p className="mt-2 max-w-[32rem] font-serif text-[1.0625rem] leading-[1.7] text-foreground/80">
+                <h3 className="text-headline font-medium leading-snug">{section.title}</h3>
+                <p className="mt-2 max-w-[32rem] font-serif text-reading leading-[1.7] text-foreground/80 [text-wrap:pretty]">
                   {section.body}
                 </p>
                 {section.seeInPhoto && (
-                  <p className="mt-3 flex max-w-[34rem] gap-2.5 border-l-2 border-brand/50 pl-4 text-sm leading-relaxed text-muted-foreground italic">
+                  <p className="mt-3 flex max-w-[32rem] gap-2.5 border-l-2 border-brand/50 pl-4 font-serif text-reading leading-relaxed text-muted-foreground italic [text-wrap:pretty]">
                     <Eye className="mt-0.5 size-3.5 shrink-0" />
                     {section.seeInPhoto}
                   </p>
@@ -360,17 +403,17 @@ export function ReportScreen() {
         </motion.section>
 
         <motion.section variants={reduceMotion ? undefined : staggerItem} className="mt-10">
-          <h2 className="text-2xl font-medium tracking-[-0.01em]">Still curious?</h2>
-          <p className="mt-3 leading-relaxed text-foreground/85">
+          <h2 className="text-title font-medium tracking-[-0.01em]">Still curious?</h2>
+          <p className="mt-3 text-body leading-relaxed text-foreground/85 [text-wrap:pretty]">
             Ask about anything you can see — the answer stays with this photo.
           </p>
-          <Button size="lg" className="mt-5" onClick={openChat}>
+          <Button size="lg" className="mt-5 whitespace-normal" onClick={openChat}>
             Ask a question
           </Button>
         </motion.section>
       </motion.article>
 
-      <div className="glass fixed inset-x-0 bottom-0 z-40 scroll-fade-b px-4 pt-3 safe-bottom">
+      <div className="glass fixed inset-x-0 bottom-0 z-40 scroll-fade-b px-4 pt-3 safe-bottom [@media(max-height:480px)]:pt-1">
         <button
           type="button"
           onClick={openChat}
@@ -379,7 +422,7 @@ export function ReportScreen() {
           <span className="flex-1 truncate text-left text-[16px] text-muted-foreground">
             Ask about {report.title}…
           </span>
-          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand text-brand-fg">
+          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand text-brand-fg [@media(max-height:480px)]:size-9">
             <ArrowUp className="size-5" />
           </span>
         </button>

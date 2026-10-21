@@ -12,12 +12,21 @@ import { sleep } from './utils'
 const MOCK_FALLBACK = import.meta.env.VITE_MOCK_ANALYSIS === 'true'
 
 export class ApiError extends Error {
+  /** A stable machine-readable reason, e.g. `session_expired` or `network_error`. */
   code: string
+  /** The HTTP status, when the failure came from the server. */
+  status: number | null
 
-  constructor(message: string, code = 'api_error') {
+  constructor(message: string, code = 'api_error', status: number | null = null) {
     super(message)
     this.name = 'ApiError'
     this.code = code
+    this.status = status
+  }
+
+  /** True when the traveller has to sign in again before the guide can answer. */
+  get isAuthFailure(): boolean {
+    return this.code === 'session_expired' || this.status === 401
   }
 }
 
@@ -25,14 +34,16 @@ function headers(token: string | null): HeadersInit {
   return token ? { authorization: `Bearer ${token}` } : {}
 }
 
-async function parseError(response: Response): Promise<string> {
+/** Reads the server's own message and reason, so the UI can name the cause. */
+async function parseError(response: Response): Promise<{ message: string; code?: string }> {
   try {
-    const body = (await response.json()) as { error?: string }
-    if (typeof body.error === 'string') return body.error
+    const body = (await response.json()) as { error?: string; code?: string }
+    const message =
+      typeof body.error === 'string' ? body.error : 'Something went wrong. Please try again.'
+    return { message, code: typeof body.code === 'string' ? body.code : undefined }
   } catch {
-    // ignore
+    return { message: 'Something went wrong. Please try again.' }
   }
-  return 'Something went wrong. Please try again.'
 }
 
 async function clientMockAnalysis(image: Blob, language: GuideLanguage): Promise<AttractionReport> {
@@ -63,13 +74,13 @@ export async function analyzePhoto(options: {
     })
 
     if (!response.ok) {
-      const message = await parseError(response)
+      const { message, code } = await parseError(response)
       // A missing local API is a dev-time situation; fall back to the built-in guide.
       if (MOCK_FALLBACK && response.status >= 500 && !import.meta.env.PROD) {
         const report = await clientMockAnalysis(image, language)
         return { report, meta: { provider: 'mock', model: 'local-demo' } }
       }
-      throw new ApiError(message, `http_${response.status}`)
+      throw new ApiError(message, code ?? `http_${response.status}`, response.status)
     }
 
     return (await response.json()) as AnalyzeResponse
@@ -103,12 +114,12 @@ export async function askGuide(options: {
     })
 
     if (!response.ok) {
-      const message = await parseError(response)
+      const { message, code } = await parseError(response)
       if (MOCK_FALLBACK && response.status >= 500 && !import.meta.env.PROD) {
         await sleep(700)
         return mockChatAnswer(report, question)
       }
-      throw new ApiError(message, `http_${response.status}`)
+      throw new ApiError(message, code ?? `http_${response.status}`, response.status)
     }
 
     const body = (await response.json()) as ChatResponse

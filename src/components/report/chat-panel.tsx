@@ -13,14 +13,19 @@ import { usePreferences } from '@/store/preferences'
 
 export function ChatPanel({ analysis }: { analysis: Analysis }) {
   const repository = useRepository()
-  const { accessToken } = useAuth()
+  const { accessToken, signIn } = useAuth()
   const bumpHistory = useAppStore((state) => state.bumpHistory)
   const hapticsEnabled = usePreferences((state) => state.haptics)
   const reduceMotion = useReducedMotion()
   const [messages, setMessages] = useState<ChatMessage[]>(analysis.messages)
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
-  const [failed, setFailed] = useState<{ id: string; question: string } | null>(null)
+  const [failed, setFailed] = useState<{
+    id: string
+    question: string
+    message: string
+    expiredSession: boolean
+  } | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -87,11 +92,30 @@ export function ChatPanel({ analysis }: { analysis: Analysis }) {
       }
     } catch (error) {
       setMessages(withUser)
-      setFailed({ id: userMessage.id, question })
-      toast.error(error instanceof ApiError ? error.message : 'The guide could not answer.')
+      const failure = error instanceof ApiError ? error : null
+      // The server names the cause; the bubble repeats it instead of guessing.
+      setFailed({
+        id: userMessage.id,
+        question,
+        message: failure?.message ?? 'The guide could not answer.',
+        expiredSession: failure?.isAuthFailure ?? false,
+      })
+      toast.error(failure?.message ?? 'The guide could not answer.')
     } finally {
       setSending(false)
     }
+  }
+
+  /** Signs the traveller back in and asks the same question again. */
+  const signInAndRetry = async () => {
+    if (!failed) return
+    try {
+      await signIn()
+    } catch {
+      toast.error('Signing in did not work. Please try again.')
+      return
+    }
+    await send(failed.question, failed.id)
   }
 
   return (
@@ -109,7 +133,7 @@ export function ChatPanel({ analysis }: { analysis: Analysis }) {
               <div className="mx-auto grid size-12 place-items-center rounded-full bg-secondary text-brand-ink">
                 <Sparkles className="size-5" />
               </div>
-              <p className="mx-auto max-w-[19rem] text-sm leading-relaxed text-muted-foreground">
+              <p className="mx-auto max-w-[19rem] text-body leading-relaxed text-muted-foreground">
                 Ask anything about {analysis.report.title}. I know the details in your photo.
               </p>
               <div className="flex flex-wrap justify-center gap-2 pt-1">
@@ -118,7 +142,7 @@ export function ChatPanel({ analysis }: { analysis: Analysis }) {
                     key={question}
                     type="button"
                     onClick={() => void send(question)}
-                    className="rounded-full bg-secondary px-3.5 py-2 text-sm text-foreground transition-transform duration-150 ease-out active:scale-[0.97]"
+                    className="rounded-full bg-secondary px-3.5 py-2 text-list text-foreground transition-transform duration-150 ease-out active:scale-[0.97]"
                   >
                     {question}
                   </button>
@@ -141,11 +165,11 @@ export function ChatPanel({ analysis }: { analysis: Analysis }) {
                 {message.role === 'user' ? 'You asked' : 'Nekibuki answered'}
               </span>
               {message.role === 'user' ? (
-                <div className="ml-auto w-fit max-w-[80%] rounded-3xl rounded-br-lg bg-primary px-4 py-2.5 text-sm leading-relaxed break-words text-primary-foreground">
+                <div className="ml-auto w-fit max-w-[80%] rounded-3xl rounded-br-lg bg-primary px-4 py-2.5 text-body leading-relaxed break-words text-primary-foreground">
                   {message.content}
                 </div>
               ) : (
-                <p className="max-w-[88%] font-serif text-[1.05rem] leading-relaxed">
+                <p className="max-w-[88%] font-serif text-reading leading-relaxed">
                   {message.content}
                 </p>
               )}
@@ -154,15 +178,25 @@ export function ChatPanel({ analysis }: { analysis: Analysis }) {
 
           {failed && (
             <div className="flex justify-end">
-              <div className="flex w-fit max-w-[80%] flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl bg-secondary px-3.5 py-2 text-sm text-foreground/70">
-                <span>No answer — the guide could not reach the server.</span>
-                <button
-                  type="button"
-                  onClick={() => void send(failed.question, failed.id)}
-                  className="shrink-0 font-medium text-destructive underline-offset-2 active:underline"
-                >
-                  Try again
-                </button>
+              <div className="flex w-fit max-w-[80%] flex-col items-end gap-1 rounded-2xl bg-secondary px-3.5 py-2 text-body text-foreground/70">
+                <span>{failed.message}</span>
+                {failed.expiredSession ? (
+                  <button
+                    type="button"
+                    onClick={() => void signInAndRetry()}
+                    className="font-medium text-ui text-brand-ink underline-offset-2 active:underline"
+                  >
+                    Sign in again
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void send(failed.question, failed.id)}
+                    className="font-medium text-ui text-brand-ink underline-offset-2 active:underline"
+                  >
+                    Try again
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -203,6 +237,7 @@ export function ChatPanel({ analysis }: { analysis: Analysis }) {
               }
             }}
             placeholder={`Ask about ${analysis.report.title}…`}
+            aria-label="Ask about this place"
             className="field-sizing-content max-h-32 min-h-10 flex-1 resize-none bg-transparent py-2.5 pl-3 text-[16px] leading-snug outline-none placeholder:text-muted-foreground"
           />
           <button
