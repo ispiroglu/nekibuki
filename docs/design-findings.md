@@ -278,3 +278,12 @@ Intentionally left out / residual:
   contrast was judged from layout, edges and measured control boxes.
 - Production is separate from this branch. It currently serves the user's
   camera-only preview (`49a511c`), not the full integration branch.
+
+## Follow-up: scored critique and fixes (2026-10-21)
+
+A scored multi-layer critique of the integration build (27/40, 38 findings) was
+run with six independent reviewers and one detector/browser evidence pass, and every
+finding was then implemented across six file-disjoint workstreams. See
+[`critique-2026-10-21.md`](critique-2026-10-21.md) for the scoring and
+[`critique-2026-10-21-fixes.md`](critique-2026-10-21-fixes.md) for the fix log.
+The full build (integration + fixes) is now live at `nekibuki.thecrafter.io`.
