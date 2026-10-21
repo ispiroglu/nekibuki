@@ -7,6 +7,21 @@ import { VitePWA } from 'vite-plugin-pwa'
 const src = fileURLToPath(new URL('./src', import.meta.url))
 const shared = fileURLToPath(new URL('./shared', import.meta.url))
 
+/**
+ * The web app manifest accepts a media-scoped list of theme colours, so the
+ * installed app's splash and task-switcher strip follow the OS scheme instead
+ * of staying paper at night. Paper and dark paper come from DESIGN.md.
+ */
+const MANIFEST_THEME_COLOR = [
+  { color: '#faf9f5', media: '(prefers-color-scheme: light)' },
+  { color: '#1f1e1d', media: '(prefers-color-scheme: dark)' },
+]
+
+const MANIFEST_BACKGROUND_COLOR = [
+  { color: '#faf9f5', media: '(prefers-color-scheme: light)' },
+  { color: '#1f1e1d', media: '(prefers-color-scheme: dark)' },
+]
+
 export default defineConfig({
   plugins: [
     react(),
@@ -19,8 +34,11 @@ export default defineConfig({
         short_name: 'Nekibuki',
         description:
           'Point your camera at a place and understand it. Photo recognition and stories for travellers.',
-        theme_color: '#faf9f5',
-        background_color: '#faf9f5',
+        // The manifest spec allows a media-scoped list here; the plugin's own
+        // types only declare the single-colour form, so the arrays are cast
+        // once, at the only place they are used.
+        theme_color: MANIFEST_THEME_COLOR as unknown as string,
+        background_color: MANIFEST_BACKGROUND_COLOR as unknown as string,
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/',
@@ -40,10 +58,30 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,jpg,jpeg,webp,woff2}'],
+        // The first visit on a weak connection should not pay for code and
+        // glyphs the browser never asks for:
+        // - the Supabase client is behind a lazy `import()` and is only fetched
+        //   when Supabase auth is enabled (it is cached at runtime instead),
+        // - the Newsreader `latin-ext` and `vietnamese` subsets are gated by
+        //   `unicode-range` and are only requested for those scripts.
+        globIgnores: [
+          '**/assets/supabase-*.js',
+          '**/assets/newsreader-latin-ext-*.woff2',
+          '**/assets/newsreader-vietnamese-*.woff2',
+        ],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//],
         cleanupOutdatedCaches: true,
         runtimeCaching: [
+          {
+            urlPattern: /\/assets\/supabase-[^/]+\.js$/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'app-chunks',
+              expiration: { maxEntries: 4, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
           {
             urlPattern: /^https:\/\/images\.unsplash\.com\/.*/i,
             handler: 'CacheFirst',
@@ -88,5 +126,32 @@ export default defineConfig({
     cssCodeSplit: true,
     sourcemap: false,
     reportCompressedSize: false,
+    rollupOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            {
+              // The TypeScript helpers are shared with the app chunks, so they
+              // keep their own chunk: nothing in the app may depend on the
+              // Supabase chunk.
+              name: 'tslib',
+              test: /node_modules[\\/]tslib[\\/]/,
+              priority: 20,
+              includeDependenciesRecursively: false,
+            },
+            {
+              // The Supabase client is behind a lazy `import()` and is never
+              // fetched in the default local-first mode. Naming the chunk keeps
+              // it addressable, so the service worker can leave it out of the
+              // precache and cache it at runtime instead.
+              name: 'supabase',
+              test: /node_modules[\\/]@supabase[\\/]/,
+              priority: 10,
+              includeDependenciesRecursively: true,
+            },
+          ],
+        },
+      },
+    },
   },
 })
