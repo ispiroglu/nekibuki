@@ -1172,15 +1172,15 @@ export function CameraScreen({
                     <button
                       type="button"
                       onClick={dismissPendingStep}
-                      className="-mr-[4px] inline-flex min-h-[44px] shrink-0 items-center rounded-full border border-white/25 px-[12px] text-[13px] font-medium text-white transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
+                      className="-mr-[4px] inline-flex min-h-[44px] shrink-0 items-center rounded-full border border-white/25 px-[12px] text-ui text-white transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
                     >
                       Not now
                     </button>
                   </div>
-                  <p className="display mt-[2px] truncate text-[22px] text-white">
+                  <p className="display mt-[2px] truncate text-lede text-white">
                     {pendingStep.title}
                   </p>
-                  <p className="mt-[2px] line-clamp-2 break-words font-serif text-[15px] leading-[1.5] text-white/90">
+                  <p className="mt-[2px] line-clamp-2 break-words font-serif text-list leading-[1.5] text-white/90">
                     {pendingStep.instruction}
                   </p>
                 </motion.div>
