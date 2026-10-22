@@ -14,6 +14,13 @@ change was verified.
 - **Preserved:** the uncommitted work that was sitting in the `pwa` worktree is snapshotted as `wip/pwa-2026-10-21` (`8d7e48c`); that working tree was not touched
 - **Verification:** `bun run typecheck` ✅ · `bun run build:only` ✅ · `bun run smoke` 12/12 against dev **and** against production ✅ · 16 coordinator checks against the live site ✅ · 0 console errors
 
+## Releases
+
+- **2026-10-21 — critique fixes.** Cloudflare Worker `nekibuki` → `nekibuki.thecrafter.io`, version `b7de7579-9edd-4d39-af7e-0cf411626849`, deployed from `master` after the branch was promoted. `master` was fast-forwarded to this branch and pushed to `origin/master` (`49a511c..636e618`).
+- **2026-10-22 — the guide proposes the next shot.** `main` carried the critique fixes forward and added the walk: the report proposes a shot, the camera states what it is looking for, the traveller can dismiss it, and the photo that answers it carries the step into the next analysis as a `continuation` (`{ placeTitle, placeName, instruction }`). Deployed from `main` at `7462a8e` (`4517125..7462a8e`), version `30f2faf3-1d15-435b-8704-a1c76e646b0d`.
+  - **Verified:** `bun run build` (typecheck + build) ✅ · `bun run smoke` 12/12 against production ✅ · 12 walk-together checks against the live site — the report proposes steps, the camera shows the title and the instruction, the dismissal is a 44 px labelled chip, dismissing returns the plain camera, the continuation reaches the analyse request with its three strings, 0 console errors ✅ · the live API answers a valid `continuation` and a malformed one alike with 200, so the error contract is untouched ✅
+  - **Measured in Chrome over a blown-out sky:** the step title 6.39:1 and the secondary text 5.56:1 against the HUD panel, the block fixed at 130 px under a two-line clamp, no horizontal overflow, and the header chrome unmoved
+
 ## How the work was split
 
 Six Orca workers, each owning a disjoint set of files, each implementing a slice of
