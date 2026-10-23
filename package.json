@@ -16,6 +16,7 @@
     "icons": "bun scripts/generate-icons.mjs",
     "shots": "bun scripts/screenshot.mjs",
     "brand:shots": "bun scripts/brand-shots.mjs",
+    "test": "bun test",
     "smoke": "bun scripts/smoke.mjs",
     "perf": "bun scripts/perf-check.mjs",
     "types": "wrangler types",

@@ -208,6 +208,26 @@ Akış:
 4. Pi, `<walk>` bölümündeki güncel duruma göre cevap üretir; gerekirse `go_to_stop` / `finish_stop` çağırır.
 5. Cevap + güncel snapshot döner. Aynı `operationId` ile tekrar denemek ikinci bir cevap üretmez.
 
+### On-the-fly turlar (2026-10-24 güncellemesi)
+
+Statik plan artık bir başlangıç noktası, tek yol değil. Analiz raporundaki "Tur başlat"
+butonu fotoğrafın konumunu ve rapor bağlamını `POST /api/walks`'a taşıyor:
+
+1. `worker/lib/overpass.ts` — fotoğrafın ~800 m çevresindeki adlandırılmış tarihi/turistik
+   POI'leri Overpass'tan çeker, mesafeye göre sıralar, en fazla 25 aday verir.
+2. `worker/walk/planner.ts` — `WALK_PLANNER_MODEL` adaylardan 5–8 durak seçer ve anlatıyı yazar.
+   Çıktı katı JSON şemasına karşı doğrulanır; bir kez retry edilir.
+3. `worker/walk/plan.ts` — koordinatlar yalnızca OSM adayından gelir, ilk durak en yakın seçili
+   durak olur, `arriveBy` mesafe + pusula yönünden üretilir. Model koordinat yazamaz.
+4. Plan JSON'u `WalkStore`'un `walk_state.plan_json` kolonunda saklanır (`ALTER TABLE` ile geriye
+   uyumlu). `WalkStore.plan()` önce saklanan planı, yoksa statik planı döndürür.
+5. D1 `walks` tablosu turu hesaba bağlar (`user_id`, `analysis_id`, başlık, dil, ilerleme,
+   durum). `GET /api/walks` açık turları döndürür; rapor ve Places ekranı "Devam et" gösterir.
+
+Overpass veya planner başarısız olursa tur üretilmez; kullanıcıya `walk_map_unavailable`,
+`walk_too_few_places`, `walk_plan_failed` gibi adlandırılmış bir hata döner. Konum yoksa
+`walk_location_required` döner ve istemci hazır planı (varsa) alternatif olarak sunar.
+
 ### Bilinen sınırlar
 
 - `PiHarness` beta; sürüm yükseltmelerinde API değişebilir.

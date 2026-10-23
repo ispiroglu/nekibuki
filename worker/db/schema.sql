@@ -63,3 +63,36 @@ create table if not exists usage_daily (
 );
 
 create index if not exists usage_daily_day_idx on usage_daily (day);
+
+-- ─────────────────────────────────────────────────────────────
+-- Account-facing index of guided walks. The route, transcript and exact
+-- progress live in the walk's Durable Object; this is what lets another
+-- device list the traveller's open tours and say "devam et".
+-- ─────────────────────────────────────────────────────────────
+create table if not exists walks (
+  id            text primary key,
+  user_id       text not null references user (id) on delete cascade,
+  -- The photo report that seeded a generated tour, when there is one.
+  analysis_id   text,
+  -- Static plans use their shipped id; generated plans get a fresh id.
+  plan_id       text not null,
+  source        text not null default 'curated' check (source in ('curated', 'generated')),
+  title         text not null,
+  title_en      text,
+  place         text not null default '',
+  country       text,
+  language      text not null default 'tr' check (language in ('en', 'tr')),
+  stop_count    integer not null default 0,
+  visited_count integer not null default 0,
+  -- Localised title of the stop the traveller is on, for list copy.
+  current_stop  text,
+  status        text not null default 'active' check (status in ('active', 'complete')),
+  created_at    integer not null,
+  updated_at    integer not null
+);
+
+create index if not exists walks_user_status_updated_idx
+  on walks (user_id, status, updated_at desc);
+
+create index if not exists walks_user_analysis_idx
+  on walks (user_id, analysis_id);

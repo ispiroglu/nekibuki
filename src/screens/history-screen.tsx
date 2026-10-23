@@ -1,5 +1,5 @@
 import type { Analysis } from '@shared/types'
-import type { WalkPlanSummary } from '@shared/walks'
+import type { WalkPlanSummary, WalkRecord } from '@shared/walks'
 import { AnimatePresence, motion } from 'motion/react'
 import { Bookmark, Camera, Footprints, Loader2, MessageSquare, Search } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-import { listWalkPlans, startWalk } from '@/lib/api'
+import { listWalkPlans, listWalks, startWalk } from '@/lib/api'
 import { haptic } from '@/lib/haptics'
 import { photoAtWidth } from '@/lib/image'
 import { staggerContainer, staggerItem } from '@/lib/motion'
@@ -240,19 +240,26 @@ function GuidedWalks() {
   const language = useUiLanguage()
   const hapticsEnabled = usePreferences((state) => state.haptics)
   const [plans, setPlans] = useState<WalkPlanSummary[] | null>(null)
+  const [activeWalks, setActiveWalks] = useState<WalkRecord[] | null>(null)
   const [starting, setStarting] = useState<string | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
-    listWalkPlans(controller.signal)
-      .then(setPlans)
-      .catch(() => {
-        // The section simply stays absent; it must not break the places list.
-      })
+    Promise.allSettled([
+      listWalkPlans(controller.signal),
+      listWalks({ signal: controller.signal }),
+    ]).then(([plansResult, walksResult]) => {
+      if (plansResult.status === 'fulfilled') setPlans(plansResult.value)
+      else setPlans([])
+      if (walksResult.status === 'fulfilled') setActiveWalks(walksResult.value)
+      else setActiveWalks([])
+    })
     return () => controller.abort()
   }, [])
 
-  if (!plans || plans.length === 0) return null
+  const ready = plans !== null && activeWalks !== null
+  const hasAny = (plans?.length ?? 0) > 0 || (activeWalks?.length ?? 0) > 0
+  if (!ready || !hasAny) return null
 
   const begin = async (plan: WalkPlanSummary) => {
     if (starting) return
@@ -277,7 +284,37 @@ function GuidedWalks() {
           <Footprints className="size-3.5" />
           {t('Guided walks', 'Adım adım geziler')}
         </div>
-        {plans.map((plan) => (
+
+        {activeWalks?.map((walk) => (
+          <div key={walk.id} className="mt-3 flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="font-serif text-[1.05rem] leading-snug">
+                {language === 'tr' ? walk.title : (walk.titleEn ?? walk.title)}
+              </p>
+              <p className="mt-0.5 truncate text-xs opacity-80">
+                {walk.visitedCount}/{walk.stopCount} {t('stops seen', 'durak görüldü')}
+                {walk.currentStop ? ` · ${walk.currentStop}` : ''}
+              </p>
+            </div>
+            <Button
+              variant="secondary"
+              size="pill"
+              onClick={() => {
+                haptic('medium', hapticsEnabled)
+                navigate(`/walk/${walk.id}`)
+              }}
+            >
+              <Footprints className="size-4" />
+              {t('Continue', 'Devam et')}
+            </Button>
+          </div>
+        ))}
+
+        {activeWalks && activeWalks.length > 0 && plans && plans.length > 0 && (
+          <div className="my-3 h-px bg-brand-fg/15" />
+        )}
+
+        {plans?.map((plan) => (
           <div key={plan.id} className="mt-3 flex items-center gap-3">
             <div className="min-w-0 flex-1">
               <p className="font-serif text-[1.05rem] leading-snug">

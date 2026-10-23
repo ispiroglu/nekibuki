@@ -183,7 +183,28 @@ export function WalkScreen() {
     if (starting) return
     setStarting(true)
     try {
-      const next = await startWalk({ planId: snapshot?.plan.id ?? 'dolmabahce', language })
+      // A generated route cannot be rebuilt from its id alone: reuse the
+      // report, or at least the origin and place, so "start again" does not
+      // silently fall back to the Dolmabahçe plan.
+      const plan = snapshot?.plan
+      const next = plan?.analysisId
+        ? await startWalk({
+            analysisId: plan.analysisId,
+            place: plan.place,
+            title: plan.title,
+            country: plan.country,
+            location: plan.origin,
+            language,
+          })
+        : plan?.source === 'generated' && plan.origin
+          ? await startWalk({
+              place: plan.place,
+              title: plan.title,
+              country: plan.country,
+              location: plan.origin,
+              language,
+            })
+          : await startWalk({ planId: plan?.id ?? 'dolmabahce', language })
       navigate(`/walk/${next.id}`, { replace: true })
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : t('Could not start a new walk.', 'Yeni yürüyüş başlatılamadı.'))
@@ -317,6 +338,17 @@ export function WalkScreen() {
               style={{ width: `${Math.max(progress, complete ? 100 : 0)}%` }}
             />
           </div>
+          {plan.origin && (
+            <p className="mt-1.5 flex items-center gap-1.5 text-label text-muted-foreground">
+              <MapPin className="size-3 shrink-0" />
+              <span className="truncate">
+                {t(
+                  'This walk starts where you took the photo',
+                  'Tur fotoğrafı çektiğin noktadan başlıyor',
+                )}
+              </span>
+            </p>
+          )}
         </div>
       </header>
 

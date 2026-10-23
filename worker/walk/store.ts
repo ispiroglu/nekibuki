@@ -8,6 +8,8 @@ export interface WalkState {
   complete: boolean
   createdAt: number
   updatedAt: number
+  /** The generated route, when this walk did not come from shared/walks.ts. */
+  planJson: string | null
 }
 
 type WalkRow = {
@@ -18,6 +20,7 @@ type WalkRow = {
   complete: number
   created_at: number
   updated_at: number
+  plan_json?: string | null
 }
 
 /**
@@ -45,6 +48,13 @@ export class WalkStore {
         updated_at INTEGER NOT NULL
       )
     `)
+    // Added after the first walks shipped. ALTER is the compatible migration:
+    // existing rows keep working and simply fall back to the static plan.
+    try {
+      this.storage.sql.exec('ALTER TABLE walk_state ADD COLUMN plan_json TEXT')
+    } catch {
+      // SQLite has no "ADD COLUMN IF NOT EXISTS"; a duplicate is expected.
+    }
     this.storage.sql.exec(`
       CREATE TABLE IF NOT EXISTS walk_visit (
         stop_id TEXT PRIMARY KEY,
@@ -61,19 +71,21 @@ export class WalkStore {
     planId: string
     language: 'tr' | 'en'
     firstStop: string | null
+    plan?: WalkPlan
   }): WalkState {
     this.ensure()
     const now = Date.now()
     this.storage.sql.exec(
       `INSERT OR IGNORE INTO walk_state
-         (walk_id, plan_id, language, current_stop, complete, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 0, ?, ?)`,
+         (walk_id, plan_id, language, current_stop, complete, created_at, updated_at, plan_json)
+       VALUES (?, ?, ?, ?, 0, ?, ?, ?)`,
       input.walkId,
       input.planId,
       input.language,
       input.firstStop,
       now,
       now,
+      input.plan ? JSON.stringify(input.plan) : null,
     )
     return this.get()!
   }
@@ -92,10 +104,20 @@ export class WalkStore {
       complete: Boolean(row.complete),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      planJson: row.plan_json ?? null,
     }
   }
 
+  /** Stored generated plan first; old rows and curated walks fall back to code. */
   plan(state: WalkState): WalkPlan {
+    if (state.planJson) {
+      try {
+        const stored = JSON.parse(state.planJson) as WalkPlan
+        if (stored && Array.isArray(stored.stops) && stored.stops.length > 0) return stored
+      } catch {
+        // A broken stored plan must not strand the traveller.
+      }
+    }
     return findPlan(state.planId) ?? findPlan(undefined)!
   }
 

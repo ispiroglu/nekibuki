@@ -1,4 +1,4 @@
-import type { WalkSnapshot } from '@shared/walks'
+import type { WalkPlan, WalkSnapshot } from '@shared/walks'
 import type { AttractionReport, GuideLanguage } from '@shared/types'
 
 /**
@@ -18,6 +18,10 @@ export type AppEnv = Env & {
   DAILY_CHATS?: string
   /** Pi's model. Defaults to the Workers AI narrator in worker/walk/agent.ts. */
   WALK_MODEL?: string
+  /** The fast model that plans a tour from OSM candidates. */
+  WALK_PLANNER_MODEL?: string
+  /** Optional Overpass mirror; defaults to overpass-api.de. */
+  OVERPASS_URL?: string
   /**
    * The walk Durable Object. Declared explicitly so the API still typechecks
    * before `wrangler types` has been regenerated.
@@ -36,6 +40,7 @@ export interface WalkAgentRpc {
     walkId: string
     planId: string
     language: GuideLanguage
+    plan?: WalkPlan
   }): Promise<WalkSnapshot>
   snapshot(): Promise<WalkSnapshot>
   message(input: {

@@ -59,6 +59,10 @@ export type ApiErrorCode =
   | 'chat_failed'
   | 'walk_failed'
   | 'walk_unavailable'
+  | 'walk_location_required'
+  | 'walk_map_unavailable'
+  | 'walk_too_few_places'
+  | 'walk_plan_failed'
   | 'internal'
 
 /** Codes implied by the HTTP status of a plain `HTTPException`. */
@@ -88,6 +92,10 @@ const PROVIDER_ERROR_CODES = new Set<ApiErrorCode>([
   'provider_error',
   'walk_failed',
   'walk_unavailable',
+  'walk_location_required',
+  'walk_map_unavailable',
+  'walk_too_few_places',
+  'walk_plan_failed',
 ])
 
 function codeForStatus(status: number): ApiErrorCode {

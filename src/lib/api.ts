@@ -11,6 +11,7 @@ import type {
 import type {
   WalkMessageResult,
   WalkPlanSummary,
+  WalkRecord,
   WalkSnapshot,
 } from '@shared/walks'
 import type { CaptureContinuation } from '@/store/app'
@@ -198,18 +199,50 @@ export async function listWalkPlans(signal?: AbortSignal): Promise<WalkPlanSumma
   return body.plans
 }
 
-export async function startWalk(options: {
-  planId: string
+export interface StartWalkOptions {
+  /** Curated route (the backwards-compatible path). */
+  planId?: string
+  /** Photo report that seeds an on-the-fly tour. */
+  analysisId?: string
+  place?: string
+  title?: string
+  country?: string
+  location?: GeoPoint
   language: GuideLanguage
   signal?: AbortSignal
-}): Promise<WalkSnapshot> {
+}
+
+/**
+ * Two modes behind one call: a curated `planId`, or a photo context that asks
+ * the Worker to build a fresh route from real places around the location.
+ */
+export async function startWalk(options: StartWalkOptions): Promise<WalkSnapshot> {
   const response = await fetch('/api/walks', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ planId: options.planId, language: options.language }),
+    body: JSON.stringify({
+      planId: options.planId,
+      analysisId: options.analysisId,
+      place: options.place,
+      title: options.title,
+      country: options.country,
+      location: options.location,
+      language: options.language,
+    }),
     signal: options.signal,
   })
   return expectJson<WalkSnapshot>(response)
+}
+
+/** The account's open tours (empty in demo mode). */
+export async function listWalks(
+  options: { status?: 'active' | 'complete' | 'all'; signal?: AbortSignal } = {},
+): Promise<WalkRecord[]> {
+  const query = options.status ? `?status=${options.status}` : ''
+  const response = await fetch(`/api/walks${query}`, { signal: options.signal })
+  if (response.status === 404) return []
+  const body = await expectJson<{ walks: WalkRecord[] }>(response)
+  return body.walks
 }
 
 export async function getWalk(id: string, signal?: AbortSignal): Promise<WalkSnapshot | null> {

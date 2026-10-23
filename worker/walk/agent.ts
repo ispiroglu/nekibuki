@@ -326,16 +326,20 @@ export class WalkAgent extends DurableObject<AppEnv> {
     walkId: string
     planId: string
     language: GuideLanguage
+    /** A plan generated for this walk; omitted for the curated Dolmabahçe route. */
+    plan?: WalkPlan
   }): Promise<WalkSnapshot> {
     await this.lifecycle.start()
-    const plan = findPlan(input.planId)
+    const plan = input.plan ?? findPlan(input.planId)
     if (!plan) throw new Error(`Unknown walk plan: ${input.planId}`)
+    if (plan.stops.length === 0) throw new Error('This walk has no stops.')
 
     const state = this.store.start({
       walkId: input.walkId,
       planId: plan.id,
       language: input.language,
       firstStop: plan.stops[0]?.id ?? null,
+      plan: input.plan,
     })
 
     return this.snapshotOf(state)

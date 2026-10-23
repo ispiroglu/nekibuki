@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from 'motion/react'
-import { walkPlanForPlace } from '@shared/walks'
+import { walkPlanForPlace, type WalkRecord } from '@shared/walks'
 import {
   ArrowUp,
   Bookmark,
@@ -17,7 +17,7 @@ import {
 import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import type { NextStep } from '@shared/types'
+import type { GeoPoint, NextStep } from '@shared/types'
 import { NextSteps } from '@/components/report/next-step'
 import { OddityCards } from '@/components/report/oddity-cards'
 import { PhotoHero } from '@/components/report/photo-hero'
@@ -34,7 +34,7 @@ import {
 import { Sheet } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAnalysis } from '@/hooks/use-history'
-import { startWalk } from '@/lib/api'
+import { listWalks, startWalk } from '@/lib/api'
 import { haptic } from '@/lib/haptics'
 import { staggerContainer, staggerItem } from '@/lib/motion'
 import { useAppStore } from '@/store/app'
@@ -69,6 +69,7 @@ export function ReportScreen() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [savingSaved, setSavingSaved] = useState(false)
   const [startingWalk, setStartingWalk] = useState(false)
+  const [activeWalk, setActiveWalk] = useState<WalkRecord | null>(null)
   const headerRef = useRef<HTMLDivElement>(null)
   const [headerInset, setHeaderInset] = useState(56)
   const [shortScreen, setShortScreen] = useState(false)
@@ -92,6 +93,23 @@ export function ReportScreen() {
     media.addEventListener('change', sync)
     return () => media.removeEventListener('change', sync)
   }, [])
+
+  // A tour that already started from this photo becomes "Devam et" instead of
+  // a second, differently planned walk.
+  useEffect(() => {
+    if (!analysis?.id) return
+    const controller = new AbortController()
+    listWalks({ signal: controller.signal })
+      .then((records) => {
+        setActiveWalk(
+          records.find((walk) => walk.analysisId === analysis.id && !walk.complete) ?? null,
+        )
+      })
+      .catch(() => {
+        // The CTA still starts a fresh tour; the account list is a bonus.
+      })
+    return () => controller.abort()
+  }, [analysis?.id])
 
   const photoOverlap = shortScreen ? PHOTO_OVERLAP_SHORT : PHOTO_OVERLAP
 
@@ -243,13 +261,35 @@ export function ReportScreen() {
   }
 
   const { report } = analysis
+  // A curated plan is a fallback for photos that arrived without a position.
   const matchingWalk = walkPlanForPlace(report.location.name, report.title)
+  const photoLocation: GeoPoint | undefined =
+    analysis.location ??
+    (typeof report.location.lat === 'number' && typeof report.location.lng === 'number'
+      ? { latitude: report.location.lat, longitude: report.location.lng }
+      : undefined)
 
   const beginWalk = async () => {
-    if (!matchingWalk || startingWalk) return
+    if (startingWalk) return
+    if (activeWalk) {
+      haptic('medium', hapticsEnabled)
+      navigate(`/walk/${activeWalk.id}`)
+      return
+    }
+    if (!photoLocation && !matchingWalk) return
+
     setStartingWalk(true)
     try {
-      const walk = await startWalk({ planId: matchingWalk.id, language: guideLanguage })
+      const walk = photoLocation
+        ? await startWalk({
+            analysisId: analysis.id,
+            title: report.title,
+            place: report.location.name,
+            country: report.location.country,
+            location: photoLocation,
+            language: guideLanguage,
+          })
+        : await startWalk({ planId: matchingWalk!.id, language: guideLanguage })
       haptic('medium', hapticsEnabled)
       navigate(`/walk/${walk.id}`)
     } catch (cause) {
@@ -262,6 +302,38 @@ export function ReportScreen() {
       setStartingWalk(false)
     }
   }
+
+  const walkTitle = activeWalk
+    ? guideLanguage === 'tr'
+      ? activeWalk.title
+      : (activeWalk.titleEn ?? activeWalk.title)
+    : matchingWalk && !photoLocation
+      ? guideLanguage === 'tr'
+        ? matchingWalk.title
+        : matchingWalk.titleEn
+      : guideLanguage === 'tr'
+        ? `${report.location.name} çevresinde bir yürüyüş`
+        : `A walk around ${report.location.name}`
+
+  const walkDescription = activeWalk
+    ? t(
+        `${activeWalk.visitedCount} of ${activeWalk.stopCount} stops seen. The guide is waiting where you left off.`,
+        `${activeWalk.stopCount} durağın ${activeWalk.visitedCount} tanesi görüldü. Rehber bıraktığın yerde bekliyor.`,
+      )
+    : photoLocation
+      ? t(
+          '5–8 real places around your photo, picked on the fly. The walk starts where you are standing and the guide tells each stop’s story when you arrive.',
+          'Fotoğrafının çevresindeki gerçek mekânlardan 5–8 durak, o an hazırlanır. Tur durduğun noktadan başlar; rehber her durağın hikâyesini oraya varınca anlatır.',
+        )
+      : matchingWalk
+        ? t(
+            `${matchingWalk.stops.length} stops, about ${matchingWalk.minutes} minutes. This photo has no location, so the ready-made route is the safer start.`,
+            `${matchingWalk.stops.length} durak, yaklaşık ${matchingWalk.minutes} dakika. Fotoğrafta konum yok; hazır rota daha güvenli bir başlangıç.`,
+          )
+        : t(
+            'This tour needs the location of the photo. Turn location on and take the photo again, or open a saved place that already has a position.',
+            'Bu tur için fotoğrafın konumu gerekiyor. Konumu açıp fotoğrafı yeniden çek ya da konumu olan kayıtlı bir yeri aç.',
+          )
 
   const confidenceLabel =
     report.confidence >= 85
@@ -401,39 +473,50 @@ export function ReportScreen() {
           ))}
         </motion.dl>
 
-        {matchingWalk && (
-          <motion.section variants={reduceMotion ? undefined : staggerItem} className="mt-8">
-            <div className="relative overflow-hidden rounded-[1.75rem] bg-brand px-5 py-5 text-brand-fg">
-              <div className="flex items-center gap-2 text-label font-medium tracking-[0.08em] uppercase opacity-80">
-                <Footprints className="size-3.5" />
-                {t('Step by step', 'Adım adım')}
-              </div>
-              <h2 className="display mt-2 text-2xl leading-tight text-balance">
-                {guideLanguage === 'tr' ? matchingWalk.title : matchingWalk.titleEn}
-              </h2>
-              <p className="mt-2 max-w-[32rem] font-serif text-reading leading-relaxed opacity-85 [text-wrap:pretty]">
-                {t(
-                  `${matchingWalk.stops.length} stops, about ${matchingWalk.minutes} minutes. The guide walks with you and tells each stop's story when you arrive.`,
-                  `${matchingWalk.stops.length} durak, yaklaşık ${matchingWalk.minutes} dakika. Rehber seninle yürür, her durağın hikâyesini oraya varınca anlatır.`,
-                )}
-              </p>
-              <Button
-                variant="secondary"
-                size="lg"
-                className="mt-4 whitespace-normal"
-                onClick={() => void beginWalk()}
-                disabled={startingWalk}
-              >
-                {startingWalk ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Footprints className="size-4" />
-                )}
-                {t('Walk this place', 'Burayı adım adım gez')}
-              </Button>
+        <motion.section variants={reduceMotion ? undefined : staggerItem} className="mt-8">
+          <div className="relative overflow-hidden rounded-[1.75rem] bg-brand px-5 py-5 text-brand-fg">
+            <div className="flex items-center gap-2 text-label font-medium tracking-[0.08em] uppercase opacity-80">
+              <Footprints className="size-3.5" />
+              {activeWalk
+                ? t('Continue your walk', 'Yürüyüşe devam')
+                : t('Step by step', 'Adım adım')}
             </div>
-          </motion.section>
-        )}
+            <h2 className="display mt-2 text-2xl leading-tight text-balance">{walkTitle}</h2>
+            <p className="mt-2 max-w-[32rem] font-serif text-reading leading-relaxed opacity-85 [text-wrap:pretty]">
+              {walkDescription}
+            </p>
+            {photoLocation && !activeWalk && (
+              <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-brand-fg/10 px-3 py-1 text-label">
+                <MapPin className="size-3" />
+                {t('This walk starts where you are standing', 'Tur senin durduğun noktadan başlıyor')}
+              </p>
+            )}
+            <Button
+              variant="secondary"
+              size="lg"
+              className="mt-4 whitespace-normal"
+              onClick={() => void beginWalk()}
+              disabled={startingWalk || (!activeWalk && !photoLocation && !matchingWalk)}
+            >
+              {startingWalk ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : !activeWalk && !photoLocation && !matchingWalk ? (
+                <MapPin className="size-4" />
+              ) : (
+                <Footprints className="size-4" />
+              )}
+              {activeWalk
+                ? t('Continue the walk', 'Tura devam et')
+                : photoLocation
+                  ? startingWalk
+                    ? t('Planning your walk…', 'Tur planlanıyor…')
+                    : t('Start the walk', 'Turu başlat')
+                  : matchingWalk
+                    ? t('Start the ready route', 'Hazır rotayı başlat')
+                    : t('Location needed', 'Konum gerekli')}
+            </Button>
+          </div>
+        </motion.section>
 
         <motion.section variants={reduceMotion ? undefined : staggerItem} className="mt-10">
           <h2 className="text-title font-medium tracking-[-0.01em]">{t('Things most people miss', 'Çoğu kişinin kaçırdığı şeyler')}</h2>

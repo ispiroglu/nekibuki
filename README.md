@@ -36,7 +36,9 @@ runs in **demo mode**: a fake Google sign-in, an on-device IndexedDB history see
 example places, and a mock vision provider that answers instantly.
 
 `bun run typecheck` regenerates Worker types and typechecks app, worker and node configs.
-`bun run build` does that plus a production build into `dist/`.
+`bun run build` does that plus a production build into `dist/`. `bun run test` runs the pure
+walk-planning unit tests (geometry, Overpass parsing, plan validation and ordering) without
+touching the network or Workers AI.
 
 ## Modes
 
@@ -148,10 +150,12 @@ no shared buckets.
 | `GET /api/analyses/:id/image?variant=photo\|chat` | Owner-only photo stream from R2 |
 | `POST /api/analyses/:id/chat` | Question → answer; the Worker reads the photo, report and history itself |
 | `POST /api/chat` | Demo-only stateless chat (report travels in the body) |
-| `GET /api/walks/plans` | Available guided walks and their stop counts |
-| `POST /api/walks` | Start a walk session; returns the plan and the first stop |
+| `GET /api/walks/plans` | Curated guided walks and their stop counts |
+| `GET /api/walks` | The signed-in traveller's open walks (empty in demo mode) |
+| `POST /api/walks` | Start a curated walk (`planId`) or generate one from a photo (`analysisId` + `location`) |
 | `GET /api/walks/:id` | The walk's current stop, progress and transcript |
 | `POST /api/walks/:id/message` | JSON text or multipart photo → the guide's answer, plus the new snapshot |
+| `POST /api/walks/:id/advance` | Leave the current stop; deterministic next stop plus a transition answer |
 | `POST /api/walks/:id/reset` | Fresh conversational context, same route progress |
 | `ALL /api/auth/*` | Better Auth (Google OAuth, session, sign-out) |
 
@@ -169,7 +173,25 @@ The step-by-step walk is a separate path from a single photo analysis. Each walk
 Durable Object (`WalkAgent`), which hosts a Pi harness over the object's SQLite database. Pi owns
 the transcript, tool calls, retries and hibernation; `WalkStore` owns the route and progress.
 
-The route lives in code (`shared/walks.ts`), not in the model. The agent gets three small tools:
+Tours are now generated on the fly as well as curated. When the report CTA is pressed with a
+photo location, `POST /api/walks`:
+
+1. loads named places around the photo from OpenStreetMap (Overpass, ~800 m radius), sorted by
+   walking distance;
+2. asks `WALK_PLANNER_MODEL` to pick 5–8 of those candidates and write the stop narratives;
+3. validates the answer against a strict JSON schema, retrying once;
+4. builds the route in code — coordinates come from OSM, `arriveBy` is computed from distance
+   and compass direction, and the nearest chosen stop starts the walk;
+5. stores the plan JSON in the walk's Durable Object and indexes the walk in D1 so "Devam et"
+   works from another device.
+
+The model never invents a place or a coordinate: it can only choose candidate ids. Overpass and
+the planner run in `worker/lib/overpass.ts` and `worker/walk/planner.ts`; the deterministic plan
+assembly and arrival text are in `worker/walk/plan.ts` and `worker/lib/geo.ts`. Both are unit
+tested under `tests/` without network calls.
+
+The route lives in code (`shared/walks.ts` for curated tours, a stored plan JSON for generated
+ones), not in the model. The agent gets three small tools:
 
 - `go_to_stop` — the traveller named a room, or the photo clearly shows a different stop.
 - `finish_stop` — mark the current stop done and return the next unvisited one.
@@ -184,7 +206,12 @@ Setup notes:
 - `wrangler.jsonc` needs the `AI` binding, the `WALK_AGENT` Durable Object binding, and a
   `new_sqlite_classes` migration. `WALK_MODEL` defaults to
   `@cf/qwen/qwen3.8-27b` for its Turkish quality; it takes ~30s per turn.
-  `@cf/meta/llama-3.3-70b-instruct-fp8-fast` is the faster (~6s) alternative.
+  `WALK_PLANNER_MODEL` defaults to `@cf/meta/llama-3.3-70b-instruct-fp8-fast` and is used only
+  for one-shot route planning, where speed matters more than prose.
+- Run `bun run db:migrate:local` (or `:remote`) after pulling: the `walks` table indexes tours
+  for the account. Existing deployments also add the `plan_json` column to the walk Durable
+  Object automatically on first use.
+- `OVERPASS_URL` is optional; the default is `https://overpass-api.de/api/interpreter`.
 - Local `wrangler dev` cannot simulate Workers AI. Either sign in (and use
   `wrangler dev` with remote bindings) or accept that `/api/walks/:id/message` returns
   `walk_failed` until the binding can reach the model.

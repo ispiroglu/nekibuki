@@ -1,4 +1,4 @@
-import type { GuideLanguage } from './types'
+import type { GeoPoint, GuideLanguage } from './types'
 
 /**
  * A guided walk is a fixed sequence of stops. The route belongs in data, not
@@ -24,6 +24,14 @@ export interface WalkStop {
   arriveBy: string
   /** Not every room is always open; the guide should say so rather than guess. */
   optional?: boolean
+  /**
+   * Coordinates come from OpenStreetMap for generated tours. The model never
+   * supplies a position: it only picks an OSM candidate by id.
+   */
+  latitude?: number
+  longitude?: number
+  /** OpenStreetMap element id, e.g. `node/123456`. */
+  osmId?: string
 }
 
 export interface WalkPlan {
@@ -36,6 +44,15 @@ export interface WalkPlan {
   /** Rough walking time, minutes. */
   minutes: number
   stops: WalkStop[]
+  /** A generated tour is written for one photo; a curated one ships in code. */
+  source?: 'curated' | 'generated'
+  /** The analysis report that seeded a generated tour. */
+  analysisId?: string
+  /** Where the walk starts: the position of the seeding photo. */
+  origin?: GeoPoint
+  /** One-paragraph introduction written by the planner. */
+  intro?: string
+  createdAt?: number
 }
 
 export interface WalkPlanSummary {
@@ -46,6 +63,27 @@ export interface WalkPlanSummary {
   country: string
   minutes: number
   stopCount: number
+  source?: 'curated' | 'generated'
+  analysisId?: string
+  origin?: GeoPoint
+}
+
+/** A walk owned by an account, as listed in Places and on a report. */
+export interface WalkRecord {
+  id: string
+  title: string
+  titleEn?: string
+  place: string
+  language: GuideLanguage
+  stopCount: number
+  visitedCount: number
+  currentStop: string | null
+  complete: boolean
+  status: 'active' | 'complete'
+  source: 'curated' | 'generated'
+  analysisId?: string
+  createdAt: number
+  updatedAt: number
 }
 
 export interface WalkStopView {
@@ -83,6 +121,9 @@ export function planSummary(plan: WalkPlan): WalkPlanSummary {
     country: plan.country,
     minutes: plan.minutes,
     stopCount: plan.stops.length,
+    source: plan.source,
+    analysisId: plan.analysisId,
+    origin: plan.origin,
   }
 }
 
