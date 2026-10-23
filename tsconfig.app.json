@@ -22,9 +22,5 @@
     },
     "types": ["vite/client"]
   },
-  "include": ["src", "shared"],
-  // Supabase was replaced by Better Auth; these two modules are unreferenced
-  // and their dependency is no longer installed. Kept out of typecheck so the
-  // app build reflects the code that actually ships.
-  "exclude": ["src/lib/supabase.ts", "src/lib/repo/supabase.ts"]
+  "include": ["src", "shared"]
 }
