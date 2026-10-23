@@ -19,7 +19,16 @@ export interface WalkPoi {
   tags: Record<string, string>
 }
 
-export const DEFAULT_OVERPASS_URL = 'https://overpass-api.de/api/interpreter'
+/**
+ * overpass-api.de answers 521 to Cloudflare Workers and is unreachable from
+ * the edge. The French mirror answers in well under a second, so it is the
+ * primary; the German instance stays as a fallback for its coverage.
+ */
+export const DEFAULT_OVERPASS_URLS = [
+  'https://overpass.openstreetmap.fr/api/interpreter',
+  'https://overpass-api.de/api/interpreter',
+] as const
+export const DEFAULT_OVERPASS_URL = DEFAULT_OVERPASS_URLS[0]
 export const WALK_RADIUS_M = 800
 export const MAX_POIS = 25
 
@@ -134,47 +143,65 @@ export async function fetchNearbyPois(
   location: GeoPoint,
   options: { url?: string; radius?: number } = {},
 ): Promise<WalkPoi[]> {
-  const url =
-    `${options.url?.trim() || DEFAULT_OVERPASS_URL}?data=` +
-    encodeURIComponent(buildOverpassQuery(location, options.radius))
+  const configured = options.url?.trim()
+  const endpoints = configured ? [configured] : [...DEFAULT_OVERPASS_URLS]
+  const query = encodeURIComponent(buildOverpassQuery(location, options.radius))
 
-  let response: Response
-  try {
-    response = await fetch(url, {
-      headers: {
-        // Overpass asks for a descriptive User-Agent and accepts a plain one.
-        'user-agent': 'Nekibuki/0.1 (https://nekibuki.thecrafter.io; walking guide)',
-        accept: 'application/json',
-      },
-      signal: AbortSignal.timeout(18_000),
-      cf: { cacheTtl: 3_600, cacheEverything: true },
-    })
-  } catch {
-    throw new ProviderError(
-      'The map service could not be reached. Try the tour again in a moment.',
-      'walk_map_unavailable',
-      504,
-    )
-  }
+  let reachedOne = false
+  let lastError: ProviderError | null = null
 
-  if (!response.ok) {
-    throw new ProviderError(
-      'The map service is busy right now. Try the tour again in a moment.',
-      'walk_map_unavailable',
-      502,
-    )
-  }
+  for (const endpoint of endpoints) {
+    const url = `${endpoint}${endpoint.includes('?') ? '&' : '?'}data=${query}`
 
-  const payload = (await response.json().catch(() => null)) as unknown
-  const pois = parseOverpass(payload, location)
+    let response: Response
+    try {
+      response = await fetch(url, {
+        headers: {
+          // Overpass asks for a descriptive User-Agent and accepts a plain one.
+          'user-agent': 'Nekibuki/0.1 (https://nekibuki.thecrafter.io; walking guide)',
+          accept: 'application/json',
+        },
+        signal: AbortSignal.timeout(15_000),
+        cf: { cacheTtl: 3_600, cacheEverything: true },
+      })
+    } catch {
+      lastError = new ProviderError(
+        'The map service could not be reached. Try the tour again in a moment.',
+        'walk_map_unavailable',
+        504,
+      )
+      continue
+    }
 
-  if (pois.length < 5) {
-    throw new ProviderError(
+    if (!response.ok) {
+      lastError = new ProviderError(
+        'The map service is busy right now. Try the tour again in a moment.',
+        'walk_map_unavailable',
+        502,
+      )
+      continue
+    }
+
+    reachedOne = true
+    const payload = (await response.json().catch(() => null)) as unknown
+    const pois = parseOverpass(payload, location)
+    if (pois.length >= 5) return pois
+
+    lastError = new ProviderError(
       'There are not enough mapped places around this photo to build a walk. Try a photo from a square, museum or old street.',
       'walk_too_few_places',
       422,
     )
   }
 
-  return pois
+  throw (
+    lastError ??
+    new ProviderError(
+      reachedOne
+        ? 'There are not enough mapped places around this photo to build a walk.'
+        : 'The map service could not be reached. Try the tour again in a moment.',
+      reachedOne ? 'walk_too_few_places' : 'walk_map_unavailable',
+      reachedOne ? 422 : 504,
+    )
+  )
 }

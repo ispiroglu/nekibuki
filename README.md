@@ -211,7 +211,9 @@ Setup notes:
 - Run `bun run db:migrate:local` (or `:remote`) after pulling: the `walks` table indexes tours
   for the account. Existing deployments also add the `plan_json` column to the walk Durable
   Object automatically on first use.
-- `OVERPASS_URL` is optional; the default is `https://overpass-api.de/api/interpreter`.
+- `OVERPASS_URL` is optional. The default is `https://overpass.openstreetmap.fr/api/interpreter`,
+  with `https://overpass-api.de/api/interpreter` as a fallback. `overpass-api.de` answers 521 to
+  Cloudflare Workers, so keep the French mirror primary unless you host your own.
 - Local `wrangler dev` cannot simulate Workers AI. Either sign in (and use
   `wrangler dev` with remote bindings) or accept that `/api/walks/:id/message` returns
   `walk_failed` until the binding can reach the model.
