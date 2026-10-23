@@ -1,6 +1,7 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 import { forwardRef } from 'react'
+import { useT } from '@/lib/ui-language'
 import { cn } from '@/lib/utils'
 
 export const Dialog = DialogPrimitive.Root
@@ -25,8 +26,10 @@ DialogOverlay.displayName = 'DialogOverlay'
 export const DialogContent = forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { hideClose?: boolean }
->(({ className, children, hideClose, ...props }, ref) => (
-  <DialogPrimitive.Portal>
+>(({ className, children, hideClose, ...props }, ref) => {
+  const t = useT()
+  return (
+    <DialogPrimitive.Portal>
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
@@ -42,12 +45,13 @@ export const DialogContent = forwardRef<
         // focus ring in the brand ink — the app's focus colour.
         <DialogPrimitive.Close className="absolute right-2 top-2 grid size-11 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary focus-visible:ring-2 focus-visible:ring-brand-ink focus-visible:ring-offset-2 focus-visible:ring-offset-popover">
           <X className="size-4" />
-          <span className="sr-only">Close</span>
+          <span className="sr-only">{t('Close', 'Kapat')}</span>
         </DialogPrimitive.Close>
       )}
-    </DialogPrimitive.Content>
-  </DialogPrimitive.Portal>
-))
+      </DialogPrimitive.Content>
+    </DialogPrimitive.Portal>
+  )
+})
 DialogContent.displayName = 'DialogContent'
 
 export function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {

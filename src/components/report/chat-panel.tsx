@@ -3,19 +3,27 @@ import { motion, useReducedMotion } from 'motion/react'
 import { ArrowUp, Sparkles } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { askGuide, ApiError } from '@/lib/api'
+import { askGuide, askGuideForAnalysis, ApiError } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import { useRepository } from '@/hooks/use-history'
 import { haptic } from '@/lib/haptics'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store/app'
 import { usePreferences } from '@/store/preferences'
+import { useT } from '@/lib/ui-language'
 
-export function ChatPanel({ analysis }: { analysis: Analysis }) {
+export function ChatPanel({
+  analysis,
+  onUpdate,
+}: {
+  analysis: Analysis
+  onUpdate?: (analysis: Analysis) => void
+}) {
   const repository = useRepository()
-  const { accessToken, signIn } = useAuth()
+  const { mode, signIn } = useAuth()
   const bumpHistory = useAppStore((state) => state.bumpHistory)
   const hapticsEnabled = usePreferences((state) => state.haptics)
+  const t = useT()
   const reduceMotion = useReducedMotion()
   const [messages, setMessages] = useState<ChatMessage[]>(analysis.messages)
   const [input, setInput] = useState('')
@@ -68,27 +76,39 @@ export function ChatPanel({ analysis }: { analysis: Analysis }) {
     setSending(true)
 
     try {
-      const answer = await askGuide({
-        report: analysis.report,
-        messages: previous,
-        question,
-        language: analysis.language,
-        token: accessToken,
-      })
-      const assistantMessage: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: answer,
-        createdAt: Date.now(),
-      }
-      const final = [...withUser, assistantMessage]
-      setMessages(final)
-      setFailed(null)
-      try {
-        await repository?.updateMessages(analysis.id, final)
+      if (mode === 'google') {
+        // The Worker owns the photo, the report and the transcript; it appends
+        // both messages and returns the whole analysis.
+        const updated = await askGuideForAnalysis({
+          analysisId: analysis.id,
+          question,
+        })
+        setMessages(updated.messages)
+        setFailed(null)
+        onUpdate?.(updated)
         bumpHistory()
-      } catch {
-        toast.error('The answer could not be saved.')
+      } else {
+        const answer = await askGuide({
+          report: analysis.report,
+          messages: previous,
+          question,
+          language: analysis.language,
+        })
+        const assistantMessage: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: answer,
+          createdAt: Date.now(),
+        }
+        const final = [...withUser, assistantMessage]
+        setMessages(final)
+        setFailed(null)
+        try {
+          await repository?.updateMessages(analysis.id, final)
+          bumpHistory()
+        } catch {
+          toast.error(t('The answer could not be saved.', 'Cevap kaydedilemedi.'))
+        }
       }
     } catch (error) {
       setMessages(withUser)
@@ -97,10 +117,10 @@ export function ChatPanel({ analysis }: { analysis: Analysis }) {
       setFailed({
         id: userMessage.id,
         question,
-        message: failure?.message ?? 'The guide could not answer.',
+        message: failure?.message ?? t('The guide could not answer.', 'Rehber cevap veremedi.'),
         expiredSession: failure?.isAuthFailure ?? false,
       })
-      toast.error(failure?.message ?? 'The guide could not answer.')
+      toast.error(failure?.message ?? t('The guide could not answer.', 'Rehber cevap veremedi.'))
     } finally {
       setSending(false)
     }
@@ -112,7 +132,7 @@ export function ChatPanel({ analysis }: { analysis: Analysis }) {
     try {
       await signIn()
     } catch {
-      toast.error('Signing in did not work. Please try again.')
+      toast.error(t('Signing in did not work. Please try again.', 'Giriş yapılamadı. Lütfen tekrar dene.'))
       return
     }
     await send(failed.question, failed.id)
@@ -134,7 +154,10 @@ export function ChatPanel({ analysis }: { analysis: Analysis }) {
                 <Sparkles className="size-5" />
               </div>
               <p className="mx-auto max-w-[19rem] text-body leading-relaxed text-muted-foreground">
-                Ask anything about {analysis.report.title}. I know the details in your photo.
+                {t(
+                  `Ask anything about ${analysis.report.title}. I know the details in your photo.`,
+                  `${analysis.report.title} hakkında ne istersen sor. Fotoğrafındaki ayrıntıları biliyorum.`,
+                )}
               </p>
               <div className="flex flex-wrap justify-center gap-2 pt-1">
                 {analysis.report.suggestedQuestions.map((question) => (
@@ -162,7 +185,7 @@ export function ChatPanel({ analysis }: { analysis: Analysis }) {
               className={cn('flex', message.role === 'user' ? 'justify-end' : 'justify-start')}
             >
               <span className="sr-only">
-                {message.role === 'user' ? 'You asked' : 'Nekibuki answered'}
+                {message.role === 'user' ? t('You asked', 'Sen sordun') : t('Nekibuki answered', 'Nekibuki cevapladı')}
               </span>
               {message.role === 'user' ? (
                 <div className="ml-auto w-fit max-w-[80%] rounded-3xl rounded-br-lg bg-primary px-4 py-2.5 text-body leading-relaxed break-words text-primary-foreground">
@@ -186,7 +209,7 @@ export function ChatPanel({ analysis }: { analysis: Analysis }) {
                     onClick={() => void signInAndRetry()}
                     className="font-medium text-ui text-brand-ink underline-offset-2 active:underline"
                   >
-                    Sign in again
+                    {t('Sign in again', 'Tekrar giriş yap')}
                   </button>
                 ) : (
                   <button
@@ -194,7 +217,7 @@ export function ChatPanel({ analysis }: { analysis: Analysis }) {
                     onClick={() => void send(failed.question, failed.id)}
                     className="font-medium text-ui text-brand-ink underline-offset-2 active:underline"
                   >
-                    Try again
+                    {t('Try again', 'Tekrar dene')}
                   </button>
                 )}
               </div>
@@ -203,7 +226,7 @@ export function ChatPanel({ analysis }: { analysis: Analysis }) {
 
           {sending && (
             <div role="status" aria-atomic="true" className="flex justify-start">
-              <span className="sr-only">Thinking…</span>
+              <span className="sr-only">{t('Thinking…', 'Düşünüyor…')}</span>
               <div aria-hidden className="flex items-center gap-1 py-2">
                 {[0, 1, 2].map((dot) => (
                   <motion.span
@@ -236,8 +259,8 @@ export function ChatPanel({ analysis }: { analysis: Analysis }) {
                 void send(input)
               }
             }}
-            placeholder={`Ask about ${analysis.report.title}…`}
-            aria-label="Ask about this place"
+            placeholder={t(`Ask about ${analysis.report.title}…`, `${analysis.report.title} hakkında sor…`)}
+            aria-label={t('Ask about this place', 'Bu yer hakkında sor')}
             className="field-sizing-content max-h-32 min-h-10 flex-1 resize-none bg-transparent py-2.5 pl-3 text-[16px] leading-snug outline-none placeholder:text-muted-foreground"
           />
           <button
@@ -245,7 +268,7 @@ export function ChatPanel({ analysis }: { analysis: Analysis }) {
             onClick={() => void send(input)}
             disabled={!input.trim() || sending}
             className="grid size-11 shrink-0 place-items-center rounded-full bg-brand text-brand-fg transition-transform duration-150 ease-out active:scale-95 disabled:opacity-40"
-            aria-label="Send"
+            aria-label={t('Send', 'Gönder')}
           >
             <ArrowUp className="size-5" />
           </button>

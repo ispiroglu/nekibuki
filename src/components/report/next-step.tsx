@@ -1,6 +1,7 @@
 import type { NextStep } from '@shared/types'
 import { Camera } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useT } from '@/lib/ui-language'
 import { cn } from '@/lib/utils'
 
 interface NextStepsProps {
@@ -22,18 +23,22 @@ interface NextStepsProps {
  * button.
  */
 export function NextSteps({ steps, placeTitle, placeName, onShoot }: NextStepsProps) {
+  const t = useT()
   // Guides saved before this field existed have no route, and an empty route
   // section would be a promise the guide cannot keep.
   if (!steps || steps.length === 0) return null
 
   return (
     <section>
-      <h2 className="text-title font-medium tracking-[-0.01em]">Where to point the camera</h2>
+      <h2 className="text-title font-medium tracking-[-0.01em]">{t('Where to point the camera', 'Kamerayı nereye tutmalısın')}</h2>
       <p className="mt-3 max-w-[32rem] text-body leading-relaxed text-muted-foreground [text-wrap:pretty]">
-        {`Pick one and the camera opens with that shot written in — you are still in ${placeName}.`}
+        {t(
+          `Pick one and the camera opens with that shot written in — you are still in ${placeName}.`,
+          `Birini seç; kamera o kareyle açılsın — hâlâ ${placeName} içindesin.`,
+        )}
       </p>
 
-      <ol className="mt-6" aria-label={`Shots to take at ${placeTitle}`}>
+      <ol className="mt-6" aria-label={t(`Shots to take at ${placeTitle}`, `${placeTitle} için çekilecek kareler`)}>
         {steps.map((step, index) => {
           const last = index === steps.length - 1
           return (
@@ -71,11 +76,11 @@ export function NextSteps({ steps, placeTitle, placeName, onShoot }: NextStepsPr
                 // The name says what will happen and which shot it is; the
                 // visible label is still inside it, so a screen reader and a
                 // sighted user hear the same words.
-                aria-label={`Shoot this: ${step.title}`}
+                aria-label={t(`Shoot this: ${step.title}`, `Bunu çek: ${step.title}`)}
                 onClick={() => onShoot(step)}
               >
                 <Camera className="size-4" aria-hidden />
-                Shoot this
+                {t('Shoot this', 'Bunu çek')}
               </Button>
             </li>
           )

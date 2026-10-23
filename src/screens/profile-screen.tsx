@@ -31,9 +31,11 @@ import { haptic } from '@/lib/haptics'
 import { initials } from '@/lib/utils'
 import { useAppStore } from '@/store/app'
 import { usePreferences, type Appearance } from '@/store/preferences'
+import { useT } from '@/lib/ui-language'
 
 export function ProfileScreen({ active }: { active?: boolean }) {
   const { user, signOut, mode } = useAuth()
+  const t = useT()
   const { analyses, repository } = useHistory()
   const { canInstall, installed, promptInstall } = useInstallPrompt()
   const guideLanguage = usePreferences((state) => state.guideLanguage)
@@ -67,7 +69,7 @@ export function ProfileScreen({ active }: { active?: boolean }) {
             <button
               type="button"
               onClick={() => setScreenIndex(1)}
-              aria-label="Open the camera"
+              aria-label={t('Open the camera', 'Kamerayı aç')}
               className="grid size-11 shrink-0 place-items-center self-end rounded-full bg-secondary text-foreground active:scale-[0.97] [@media(max-height:480px)]:self-auto"
             >
               <Camera className="size-5" />
@@ -85,7 +87,7 @@ export function ProfileScreen({ active }: { active?: boolean }) {
               </Heading>
               <p className="truncate text-sm text-muted-foreground">{user?.email}</p>
               <span className="mt-2 inline-flex items-center rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground">
-                {mode === 'supabase' ? 'Google account' : 'Demo account'}
+                {mode === 'google' ? t('Google account', 'Google hesabı') : t('Demo account', 'Demo hesap')}
               </span>
             </div>
           </div>
@@ -93,9 +95,9 @@ export function ProfileScreen({ active }: { active?: boolean }) {
 
         <dl className="mt-8 grid grid-cols-3 gap-2">
           {[
-            { label: 'Places', value: stats.places },
-            { label: 'Cities', value: stats.cities },
-            { label: 'Messages', value: stats.messages },
+            { label: t('Places', 'Yerler'), value: stats.places },
+            { label: t('Cities', 'Şehirler'), value: stats.cities },
+            { label: t('Messages', 'Mesajlar'), value: stats.messages },
           ].map((item) => (
             <div key={item.label} className="rounded-2xl bg-secondary px-4 py-3">
               <dd className="font-serif text-3xl tabular-nums">{item.value}</dd>
@@ -104,11 +106,11 @@ export function ProfileScreen({ active }: { active?: boolean }) {
           ))}
         </dl>
 
-        <Group title="The guide">
-          <Row icon={<Globe />} title="Language" description="Guide language">
+        <Group title={t('The guide', 'Rehber')}>
+          <Row icon={<Globe />} title={t('Language', 'Dil')} description={t('App and guide language', 'Uygulama ve rehber dili')}>
             <Segmented
               className="shrink-0"
-              label="Guide language"
+              label={t('Guide language', 'Rehber dili')}
               value={guideLanguage}
               onChange={(value) => {
                 setGuideLanguage(value)
@@ -120,7 +122,7 @@ export function ProfileScreen({ active }: { active?: boolean }) {
               ]}
             />
           </Row>
-          <Row icon={<Sparkles />} title="Intro slides" description="Show it again">
+          <Row icon={<Sparkles />} title={t('Intro slides', 'Tanıtım slaytları')} description={t('Show it again', 'Tekrar göster')}>
             <Button
               variant="secondary"
               size="sm"
@@ -130,37 +132,37 @@ export function ProfileScreen({ active }: { active?: boolean }) {
                 usePreferences.setState((state) => ({
                   onboarded: { ...state.onboarded, [userId]: false },
                 }))
-                toast('The welcome slides will show on next launch')
+                toast(t('The welcome slides will show on next launch', 'Karşılama slaytları bir sonraki açılışta gösterilecek'))
               }}
             >
-              Show again
+              {t('Show again', 'Tekrar göster')}
             </Button>
           </Row>
         </Group>
 
-        <Group title="Appearance & feel">
+        <Group title={t('Appearance & feel', 'Görünüm ve his')}>
           <Row
             icon={<MonitorCog />}
-            title="Appearance"
-            description="Match your device or pick one"
+            title={t('Appearance', 'Görünüm')}
+            description={t('Match your device or pick one', 'Cihazınla eşleştir ya da seç')}
             stacked
           >
             <Segmented
-              label="Appearance"
+              label={t('Appearance', 'Görünüm')}
               value={appearance}
               onChange={(value: Appearance) => setAppearance(value)}
               options={[
-                { value: 'system', label: 'Auto' },
-                { value: 'light', label: 'Light' },
-                { value: 'dark', label: 'Dark' },
+                { value: 'system', label: t('Auto', 'Otomatik') },
+                { value: 'light', label: t('Light', 'Açık') },
+                { value: 'dark', label: t('Dark', 'Koyu') },
               ]}
             />
           </Row>
           <Row
             icon={<Vibrate />}
-            title="Haptics"
+            title={t('Haptics', 'Titreşim')}
             titleId="profile-haptics-label"
-            description="A gentle tap on capture"
+            description={t('A gentle tap on capture', 'Çekimde hafif bir dokunuş')}
           >
             <Switch
               aria-labelledby="profile-haptics-label"
@@ -173,16 +175,16 @@ export function ProfileScreen({ active }: { active?: boolean }) {
           </Row>
         </Group>
 
-        <Group title="App">
+        <Group title={t('App', 'Uygulama')}>
           <button
             type="button"
             onClick={async () => {
               if (!canInstall) {
-                toast('Use your browser menu → “Add to Home Screen”')
+                toast(t('Use your browser menu → “Add to Home Screen”', 'Tarayıcı menüsünden → “Ana Ekrana Ekle”yi kullan'))
                 return
               }
               const accepted = await promptInstall()
-              if (accepted) toast.success('Nekibuki was added to your home screen')
+              if (accepted) toast.success(t('Nekibuki was added to your home screen', 'Nekibuki ana ekranına eklendi'))
             }}
             className="flex min-h-12 w-full items-center gap-3 px-4 text-left active:bg-accent/60"
           >
@@ -190,13 +192,13 @@ export function ProfileScreen({ active }: { active?: boolean }) {
               <Download />
             </span>
             <span className="min-w-0 flex-1 py-3">
-              <span className="block truncate text-[15px] font-medium">Install Nekibuki</span>
+              <span className="block truncate text-[15px] font-medium">{t('Install Nekibuki', 'Nekibuki\'yi yükle')}</span>
               <span className="block truncate text-xs text-muted-foreground">
                 {installed
-                  ? 'Already installed'
+                  ? t('Already installed', 'Zaten yüklü')
                   : canInstall
-                    ? 'Add it to your home screen'
-                    : 'From your browser menu'}
+                    ? t('Add it to your home screen', 'Ana ekranına ekle')
+                    : t('From your browser menu', 'Tarayıcı menüsünden')}
               </span>
             </span>
             <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
@@ -213,10 +215,10 @@ export function ProfileScreen({ active }: { active?: boolean }) {
           </span>
           <span className="min-w-0 flex-1 py-3">
             <span className="block truncate text-[15px] font-medium text-destructive">
-              Clear my places
+              {t('Clear my places', 'Yerlerimi temizle')}
             </span>
             <span className="block truncate text-xs text-muted-foreground">
-              Removes every saved guide
+              {t('Removes every saved guide', 'Kaydedilen tüm rehberleri kaldırır')}
             </span>
           </span>
           <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
@@ -227,27 +229,26 @@ export function ProfileScreen({ active }: { active?: boolean }) {
           onClick={() => void signOut()}
           className="mt-8 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-card font-medium text-foreground shadow-[0_0_0_1px_var(--border)] active:scale-[0.99]"
         >
-          <LogOut className="size-4" /> Sign out
+          <LogOut className="size-4" /> {t('Sign out', 'Çıkış yap')}
         </button>
 
         <p className="mt-6 flex items-center justify-center gap-2 text-center text-xs text-muted-foreground">
           <Info className="size-3.5" />
-          Nekibuki v0.1 · made for curious travellers
+          {t('Nekibuki v0.1 · made for curious travellers', 'Nekibuki v0.1 · meraklı gezginler için')}
         </p>
       </div>
 
       <Dialog open={confirmClear} onOpenChange={setConfirmClear}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Clear everything?</DialogTitle>
+            <DialogTitle>{t('Clear everything?', 'Her şey temizlensin mi?')}</DialogTitle>
             <DialogDescription>
-              Your saved guides and conversations will be deleted from this device. This cannot be
-              undone.
+              {t('Your saved guides and conversations will be deleted from this device. This cannot be undone.', 'Kaydedilen rehberlerin ve sohbetlerin bu cihazdan silinecek. Bu işlem geri alınamaz.')}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setConfirmClear(false)}>
-              Keep them
+              {t('Keep them', 'Kalsın')}
             </Button>
             <Button
               variant="destructive"
@@ -255,10 +256,10 @@ export function ProfileScreen({ active }: { active?: boolean }) {
                 await repository?.clear()
                 bumpHistory()
                 setConfirmClear(false)
-                toast.success('All places cleared')
+                toast.success(t('All places cleared', 'Tüm yerler temizlendi'))
               }}
             >
-              <Trash2 className="size-4" /> Clear
+              <Trash2 className="size-4" /> {t('Clear', 'Temizle')}
             </Button>
           </DialogFooter>
         </DialogContent>

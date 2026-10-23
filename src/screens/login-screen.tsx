@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import { Logo } from '@/components/brand/logo'
 import { useAuth } from '@/lib/auth'
 import { spring } from '@/lib/motion'
+import { pickLanguage, useT, useUiLanguage } from '@/lib/ui-language'
 
 const LINK =
   'rounded-sm text-brand-ink underline decoration-brand-ink/40 underline-offset-4 transition-colors hover:decoration-brand-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ink'
@@ -35,23 +36,35 @@ export function readOAuthError(): OAuthError | null {
   return null
 }
 
-export function describeOAuthFailure(code: string | null): OAuthFailure {
+export function describeOAuthFailure(code: string | null, language: 'en' | 'tr' = 'en'): OAuthFailure {
   switch (code) {
     case 'access_denied':
       return {
-        title: 'Sign-in was cancelled.',
-        hint: 'Nothing changed on your account. Try again when you’re ready.',
+        title: pickLanguage(language, 'Sign-in was cancelled.', 'Giriş iptal edildi.'),
+        hint: pickLanguage(
+          language,
+          'Nothing changed on your account. Try again when you’re ready.',
+          'Hesabında bir şey değişmedi. Hazır olduğunda tekrar dene.',
+        ),
       }
     case 'temporarily_unavailable':
     case 'server_error':
       return {
-        title: 'Google couldn’t sign you in just now.',
-        hint: 'This is usually temporary. Try again in a moment.',
+        title: pickLanguage(language, 'Google couldn’t sign you in just now.', 'Google şu anda giriş yapamadı.'),
+        hint: pickLanguage(
+          language,
+          'This is usually temporary. Try again in a moment.',
+          'Bu genellikle geçicidir. Birazdan tekrar dene.',
+        ),
       }
     default:
       return {
-        title: 'We couldn’t finish signing you in.',
-        hint: 'Allow cookies for this site, then try again.',
+        title: pickLanguage(language, 'We couldn’t finish signing you in.', 'Girişi tamamlayamadık.'),
+        hint: pickLanguage(
+          language,
+          'Allow cookies for this site, then try again.',
+          'Bu site için çerezlere izin ver, sonra tekrar dene.',
+        ),
       }
   }
 }
@@ -81,6 +94,8 @@ function GoogleMark({ className }: { className?: string }) {
 
 export function LoginScreen() {
   const { signIn, loading, error, mode } = useAuth()
+  const language = useUiLanguage()
+  const t = useT()
   const [pending, setPending] = useState(false)
   const [oauth] = useState<OAuthError | null>(() => readOAuthError())
   const reduceMotion = useReducedMotion()
@@ -96,11 +111,11 @@ export function LoginScreen() {
   }, [oauth])
 
   const failure: OAuthFailure | null = oauth
-    ? describeOAuthFailure(oauth.code)
+    ? describeOAuthFailure(oauth.code, language)
     : error
       ? {
-          title: 'Sign-in didn’t start.',
-          hint: 'Check your connection, then try again.',
+          title: t('Sign-in didn’t start.', 'Giriş başlamadı.'),
+          hint: t('Check your connection, then try again.', 'Bağlantını kontrol edip tekrar dene.'),
         }
       : null
   const busy = pending || loading
@@ -116,11 +131,23 @@ export function LoginScreen() {
         <p className="display text-lg text-brand-ink">Nekibuki</p>
         <Logo className="mt-5 size-16 text-foreground sm:mt-6 sm:size-20 [@media(orientation:landscape)_and_(max-height:560px)]:mt-3 [@media(orientation:landscape)_and_(max-height:560px)]:size-12 [@media(max-height:360px)]:hidden" draw={!reduceMotion} />
         <h1 className="display mt-7 text-[clamp(2.25rem,12vw,3.25rem)] font-medium sm:mt-10 [@media(orientation:landscape)_and_(max-height:560px)]:mt-4 [@media(orientation:landscape)_and_(max-height:560px)]:text-4xl [@media(max-height:360px)]:mt-3">
-          A quiet guide for the places you <em className="not-italic text-brand-ink">walk past</em>.
+          {language === 'tr' ? (
+            <>
+              Yanından geçip gittiğin yerler için{' '}
+              <em className="not-italic text-brand-ink">sakin bir rehber</em>.
+            </>
+          ) : (
+            <>
+              A quiet guide for the places you{' '}
+              <em className="not-italic text-brand-ink">walk past</em>.
+            </>
+          )}
         </h1>
         <p className="mt-4 max-w-xs text-base leading-relaxed text-muted-foreground sm:mt-5 sm:text-lg [@media(orientation:landscape)_and_(max-height:560px)]:mt-4 [@media(orientation:landscape)_and_(max-height:560px)]:max-w-none [@media(orientation:landscape)_and_(max-height:560px)]:text-base [@media(orientation:landscape)_and_(max-height:560px)]:leading-6 [@media(max-height:360px)]:mt-3 [@media(max-height:360px)]:leading-snug">
-          Point your camera at a monument, a landscape or a corner of a city. Nekibuki tells you what
-          it is, what to look at, and four things worth remembering.
+          {t(
+            'Point your camera at a monument, a landscape or a corner of a city. Nekibuki tells you what it is, what to look at, and four things worth remembering.',
+            'Kameranı bir anıta, manzaraya ya da şehrin bir köşesine tut. Nekibuki ne olduğunu, neye bakman gerektiğini ve hatırlamaya değer dört şeyi anlatır.',
+          )}
         </p>
       </motion.div>
 
@@ -154,27 +181,27 @@ export function LoginScreen() {
           {busy ? (
             <>
               <Loader2 aria-hidden className="size-5 animate-spin motion-reduce:animate-none" />
-              Signing you in…
+              {t('Signing you in…', 'Giriş yapılıyor…')}
             </>
           ) : (
             <>
               <GoogleMark className="size-5" />
-              {failure ? 'Try Google again' : 'Continue with Google'}
+              {failure ? t('Try Google again', 'Google ile tekrar dene') : t('Continue with Google', 'Google ile devam et')}
             </>
           )}
         </button>
 
         <p className="mt-4 text-center text-xs text-muted-foreground">
-          By continuing you agree to our{' '}
+          {t('By continuing you agree to our', 'Devam ederek şunları kabul etmiş olursun:')}{' '}
           <Link to="/terms" className={LINK}>
-            Terms
+            {t('Terms', 'Koşullar')}
           </Link>{' '}
-          and{' '}
+          {t('and', 've')}{' '}
           <Link to="/privacy" className={LINK}>
-            Privacy Policy
+            {t('Privacy Policy', 'Gizlilik Politikası')}
           </Link>
           .
-          {mode === 'mock' && ' Demo mode — no Google account is contacted.'}
+          {mode === 'mock' && t(' Demo mode — no Google account is contacted.', ' Demo modu — hiçbir Google hesabına bağlanılmaz.')}
         </p>
       </motion.div>
     </main>

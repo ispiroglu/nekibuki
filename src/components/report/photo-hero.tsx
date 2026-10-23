@@ -4,6 +4,7 @@ import { X } from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { photoSrcSet } from '@/lib/image'
 import { clamp, cn } from '@/lib/utils'
+import { useT } from '@/lib/ui-language'
 
 /**
  * The captured photo with tappable annotations.
@@ -134,6 +135,7 @@ export function PhotoHero({
   /** How far the report article rises over the bottom of the photo. */
   bottomInset?: number
 }) {
+  const t = useT()
   const [activeId, setActiveId] = useState<string | null>(null)
   const [hintVisible, setHintVisible] = useState(true)
   const [failed, setFailed] = useState(false)
@@ -460,7 +462,7 @@ export function PhotoHero({
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="label-caps text-white/70">In the frame</p>
+                  <p className="label-caps text-white/70">{t('In the frame', 'Karede')}</p>
                   <h3 id={detailTitleId} className="display mt-1 text-headline">
                     {active.title}
                   </h3>
@@ -470,7 +472,7 @@ export function PhotoHero({
                   type="button"
                   onClick={close}
                   className="grid size-11 shrink-0 place-items-center rounded-full bg-white/15 text-white transition-transform duration-150 ease-out active:scale-95"
-                  aria-label="Close detail"
+                  aria-label={t('Close detail', 'Ayrıntıyı kapat')}
                 >
                   <X className="size-4" />
                 </button>

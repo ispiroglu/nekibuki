@@ -8,6 +8,7 @@ import {
 } from 'motion/react'
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
+import { useT } from '@/lib/ui-language'
 
 /** Apple's momentum projection (Designing Fluid Interfaces). */
 function project(velocity: number, decelerationRate = 0.998) {
@@ -88,6 +89,7 @@ export function SwipeDeck({
   children: ReactNode[]
   className?: string
 }) {
+  const t = useT()
   const containerRef = useRef<HTMLDivElement>(null)
   const hintId = useId()
   const x = useMotionValue(0)
@@ -289,7 +291,7 @@ export function SwipeDeck({
     <div
       ref={containerRef}
       role="group"
-      aria-label="Main screens"
+      aria-label={t('Main screens', 'Ana ekranlar')}
       aria-describedby={hintId}
       tabIndex={0}
       onPointerDown={onPointerDown}

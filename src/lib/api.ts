@@ -1,12 +1,18 @@
 import { mockChatAnswer, mockReportForSeed } from '@shared/mock-reports'
 import type {
+  Analysis,
   AnalyzeResponse,
   AttractionReport,
   ChatMessage,
   ChatResponse,
-  GeoPoint,
   GuideLanguage,
+  GeoPoint,
 } from '@shared/types'
+import type {
+  WalkMessageResult,
+  WalkPlanSummary,
+  WalkSnapshot,
+} from '@shared/walks'
 import type { CaptureContinuation } from '@/store/app'
 import { sleep } from './utils'
 
@@ -31,10 +37,6 @@ export class ApiError extends Error {
   }
 }
 
-function headers(token: string | null): HeadersInit {
-  return token ? { authorization: `Bearer ${token}` } : {}
-}
-
 /** Reads the server's own message and reason, so the UI can name the cause. */
 async function parseError(response: Response): Promise<{ message: string; code?: string }> {
   try {
@@ -53,31 +55,43 @@ async function clientMockAnalysis(image: Blob, language: GuideLanguage): Promise
   return structuredClone(mockReportForSeed(seed).report)
 }
 
-export async function analyzePhoto(options: {
+export interface AnalyzePhotoOptions {
   image: Blob
+  /** 720px copy kept for follow-up questions. Omit in demo mode. */
+  chatImage?: Blob
+  /**
+   * Client-generated idempotency key. Sending it asks the Worker to archive
+   * the capture; omitting it keeps the request stateless (demo mode).
+   */
+  captureId?: string
   location?: GeoPoint
+  /** Compass heading in degrees, when the device reports one. */
+  heading?: number
+  /** A candidate the traveller picked after a low-confidence answer. */
+  hint?: string
   language: GuideLanguage
-  token: string | null
   signal?: AbortSignal
   /** The shot the guide asked for, when this photo answers it. */
   continuation?: CaptureContinuation
-}): Promise<AnalyzeResponse> {
-  const { image, location, language, token, signal, continuation } = options
+}
+
+export async function analyzePhoto(options: AnalyzePhotoOptions): Promise<AnalyzeResponse> {
+  const { image, chatImage, captureId, location, heading, hint, language, signal, continuation } =
+    options
   const form = new FormData()
   form.append('image', image, 'capture.jpg')
+  if (chatImage) form.append('chatImage', chatImage, 'chat.jpg')
+  if (captureId) form.append('captureId', captureId)
   if (location) form.append('location', JSON.stringify(location))
+  if (typeof heading === 'number' && Number.isFinite(heading)) {
+    form.append('heading', String(heading))
+  }
+  if (hint) form.append('hint', hint)
   form.append('language', language)
-  // Three strings about the walk so far. They travel with the photo, never
-  // with the request body: the endpoint already reads multipart.
   if (continuation) form.append('continuation', JSON.stringify(continuation))
 
   try {
-    const response = await fetch('/api/analyze', {
-      method: 'POST',
-      body: form,
-      headers: headers(token),
-      signal,
-    })
+    const response = await fetch('/api/analyze', { method: 'POST', body: form, signal })
 
     if (!response.ok) {
       const { message, code } = await parseError(response)
@@ -101,20 +115,20 @@ export async function analyzePhoto(options: {
   }
 }
 
+/** Demo-mode chat: the report travels with the request and nothing is stored. */
 export async function askGuide(options: {
   report: AttractionReport
   messages: ChatMessage[]
   question: string
   language: GuideLanguage
-  token: string | null
   signal?: AbortSignal
 }): Promise<string> {
-  const { report, messages, question, language, token, signal } = options
+  const { report, messages, question, language, signal } = options
 
   try {
     const response = await fetch('/api/chat', {
       method: 'POST',
-      headers: { 'content-type': 'application/json', ...headers(token) },
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ report, messages, question, language }),
       signal,
     })
@@ -138,5 +152,166 @@ export async function askGuide(options: {
       return mockChatAnswer(report, question)
     }
     throw new ApiError('Could not reach the guide. Check your connection.', 'network_error')
+  }
+}
+
+/**
+ * Remote chat. The Worker already has the photo, the report and the history,
+ * so the client only sends the question. The whole analysis comes back with
+ * the two new messages appended.
+ */
+export async function askGuideForAnalysis(options: {
+  analysisId: string
+  question: string
+  signal?: AbortSignal
+}): Promise<Analysis> {
+  const { analysisId, question, signal } = options
+  try {
+    const response = await fetch(`/api/analyses/${encodeURIComponent(analysisId)}/chat`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ question }),
+      signal,
+    })
+
+    if (!response.ok) {
+      const { message, code } = await parseError(response)
+      throw new ApiError(message, code ?? `http_${response.status}`, response.status)
+    }
+
+    const body = (await response.json()) as { analysis: Analysis }
+    return body.analysis
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error
+    if (error instanceof ApiError) throw error
+    throw new ApiError('Could not reach the guide. Check your connection.', 'network_error')
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Guided walks (Pi Durable)
+// ─────────────────────────────────────────────────────────────
+
+export async function listWalkPlans(signal?: AbortSignal): Promise<WalkPlanSummary[]> {
+  const response = await fetch('/api/walks/plans', { signal })
+  const body = await expectJson<{ plans: WalkPlanSummary[] }>(response)
+  return body.plans
+}
+
+export async function startWalk(options: {
+  planId: string
+  language: GuideLanguage
+  signal?: AbortSignal
+}): Promise<WalkSnapshot> {
+  const response = await fetch('/api/walks', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ planId: options.planId, language: options.language }),
+    signal: options.signal,
+  })
+  return expectJson<WalkSnapshot>(response)
+}
+
+export async function getWalk(id: string, signal?: AbortSignal): Promise<WalkSnapshot | null> {
+  const response = await fetch(`/api/walks/${encodeURIComponent(id)}`, { signal })
+  if (response.status === 404) return null
+  return expectJson<WalkSnapshot>(response)
+}
+
+/**
+ * One walk turn. `operationId` makes a retry safe: the same id is one Pi
+ * submission, so a flaky connection cannot buy two answers.
+ */
+export async function sendWalkMessage(options: {
+  id: string
+  text?: string
+  image?: Blob
+  operationId?: string
+  signal?: AbortSignal
+}): Promise<WalkMessageResult> {
+  const { id, text, image, operationId, signal } = options
+  let body: BodyInit
+  const headers: Record<string, string> = {}
+
+  if (image) {
+    const form = new FormData()
+    if (text) form.append('text', text)
+    if (operationId) form.append('operationId', operationId)
+    form.append('image', image, 'walk.jpg')
+    body = form
+  } else {
+    headers['content-type'] = 'application/json'
+    body = JSON.stringify({ text, operationId })
+  }
+
+  const response = await fetch(`/api/walks/${encodeURIComponent(id)}/message`, {
+    method: 'POST',
+    headers,
+    body,
+    signal,
+  })
+  return expectJson<WalkMessageResult>(response)
+}
+
+export async function advanceWalk(id: string): Promise<WalkMessageResult> {
+  const response = await fetch(`/api/walks/${encodeURIComponent(id)}/advance`, {
+    method: 'POST',
+  })
+  return expectJson<WalkMessageResult>(response)
+}
+
+export async function resetWalk(id: string): Promise<WalkSnapshot> {
+  const response = await fetch(`/api/walks/${encodeURIComponent(id)}/reset`, { method: 'POST' })
+  return expectJson<WalkSnapshot>(response)
+}
+
+// ─────────────────────────────────────────────────────────────
+// Analyses CRUD, used by ApiRepository in remote mode.
+// ─────────────────────────────────────────────────────────────
+
+async function expectJson<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    const { message, code } = await parseError(response)
+    throw new ApiError(message, code ?? `http_${response.status}`, response.status)
+  }
+  return (await response.json()) as T
+}
+
+export async function listAnalyses(): Promise<Analysis[]> {
+  const response = await fetch('/api/analyses')
+  const body = await expectJson<{ analyses: Analysis[] }>(response)
+  return body.analyses
+}
+
+export async function getAnalysis(id: string): Promise<Analysis | null> {
+  const response = await fetch(`/api/analyses/${encodeURIComponent(id)}`)
+  if (response.status === 404) return null
+  const body = await expectJson<{ analysis: Analysis }>(response)
+  return body.analysis
+}
+
+export async function setAnalysisSaved(id: string, saved: boolean): Promise<Analysis> {
+  const response = await fetch(`/api/analyses/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ saved }),
+  })
+  const body = await expectJson<{ analysis: Analysis }>(response)
+  return body.analysis
+}
+
+export async function deleteAnalysis(id: string): Promise<void> {
+  const response = await fetch(`/api/analyses/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  if (!response.ok && response.status !== 404) {
+    const { message, code } = await parseError(response)
+    throw new ApiError(message, code ?? `http_${response.status}`, response.status)
+  }
+}
+
+export async function clearAnalyses(): Promise<void> {
+  const response = await fetch('/api/analyses', { method: 'DELETE' })
+  if (!response.ok) {
+    const { message, code } = await parseError(response)
+    throw new ApiError(message, code ?? `http_${response.status}`, response.status)
   }
 }

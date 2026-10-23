@@ -15,6 +15,7 @@ import {
 import { motion } from 'motion/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { staggerItem } from '@/lib/motion'
+import { useT } from '@/lib/ui-language'
 import { cn } from '@/lib/utils'
 
 const ICONS: Record<TriviaIcon, typeof Sparkles> = {
@@ -36,6 +37,7 @@ const CAROUSEL_QUERY = '(max-width: 767px)'
 const SCROLL_PADDING = 24
 
 export function TriviaCarousel({ trivia }: { trivia: Trivia[] }) {
+  const t = useT()
   const scrollerRef = useRef<HTMLDivElement>(null)
   const [atEnd, setAtEnd] = useState(false)
   const [isCarousel, setIsCarousel] = useState(true)
@@ -95,7 +97,7 @@ export function TriviaCarousel({ trivia }: { trivia: Trivia[] }) {
           onScroll={syncScroll}
           tabIndex={0}
           role="region"
-          aria-label="Trivia cards"
+          aria-label={t('Trivia cards', 'Bilgi kartları')}
           aria-roledescription={isCarousel ? 'carousel' : undefined}
           className="-mx-6 flex snap-row gap-3 overflow-x-auto overscroll-x-contain scroll-px-6 px-6 pb-2 no-scrollbar max-[399px]:-mx-5 max-[399px]:scroll-px-5 max-[399px]:px-5 max-[359px]:-mx-4 max-[359px]:scroll-px-4 max-[359px]:px-4 md:mx-0 md:grid md:grid-cols-2 md:overflow-visible md:px-0"
         >
@@ -113,7 +115,7 @@ export function TriviaCarousel({ trivia }: { trivia: Trivia[] }) {
                     <Icon className="size-4" strokeWidth={1.9} />
                   </span>
                   <span className="pt-1.5 text-label font-medium text-muted-foreground tabular-nums">
-                    {index + 1} of {trivia.length}
+                    {index + 1} {t('of', '/')} {trivia.length}
                   </span>
                 </div>
                 <p className="label-caps mt-4 text-muted-foreground">{item.label}</p>
@@ -145,7 +147,7 @@ export function TriviaCarousel({ trivia }: { trivia: Trivia[] }) {
           <button
             type="button"
             onClick={() => goTo(Math.min(activeIndex + 1, trivia.length - 1))}
-            aria-label="Next card"
+            aria-label={t('Next card', 'Sonraki kart')}
             inert={atEnd ? true : undefined}
             className={cn(
               // The arrow sits on the column's right edge, the mirror of the
@@ -177,7 +179,7 @@ export function TriviaCarousel({ trivia }: { trivia: Trivia[] }) {
             ))}
           </div>
           <p className="sr-only" aria-live="polite">
-            Card {activeIndex + 1} of {trivia.length}
+            {t('Card', 'Kart')} {activeIndex + 1} {t('of', '/')} {trivia.length}
           </p>
         </div>
       )}

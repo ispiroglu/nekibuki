@@ -1,5 +1,5 @@
 import type { AttractionReport, GuideLanguage } from '@shared/types'
-import type { VisionContinuation } from './types'
+import type { NearbyPlace, VisionContinuation } from './types'
 
 const SYSTEM = `You are Nekibuki, a warm and precise travel guide.
 You look at one photograph taken by a traveller and explain the place in it.
@@ -34,16 +34,54 @@ This guide continues that walk:
 - Keep the same voice and roughly the same length as the first guide.`
 }
 
+const COMPASS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west']
+
+function headingLine(heading?: number): string {
+  if (typeof heading !== 'number' || !Number.isFinite(heading)) return ''
+  const normalised = ((heading % 360) + 360) % 360
+  const direction = COMPASS[Math.round(normalised / 45) % 8]
+  return `The camera was facing about ${Math.round(normalised)}° (${direction}). Two similar façades on opposite sides of a square are not the same place.`
+}
+
+/**
+ * Nearby article titles are hypotheses, not answers. The model must still
+ * find the thing in the photo; otherwise a geosearch result can hijack a
+ * photograph of a plaque next to a famous monument.
+ */
+function nearbyLine(nearby?: NearbyPlace[]): string {
+  if (!nearby?.length) return ''
+  const list = nearby
+    .slice(0, 8)
+    .map((place) => (place.distance ? `${place.title} (${place.distance} m away)` : place.title))
+    .join('; ')
+  return `Articles near the camera, nearest first: ${list}.
+These are candidates, not facts. Use one only if the photograph clearly shows it. If none fits, ignore the list and describe what is actually visible.`
+}
+
+function hintLine(hint?: string): string {
+  if (!hint) return ''
+  return `The traveller believes this is "${hint}". Confirm or reject that against the photograph. If you reject it, say what you see instead and lower confidence.`
+}
+
 export function buildAnalyzePrompt(
   language: GuideLanguage,
   location?: { latitude: number; longitude: number; accuracy?: number },
   continuation?: VisionContinuation,
+  context?: { heading?: number; nearby?: NearbyPlace[]; hint?: string },
 ): string {
   const languageName = language === 'tr' ? 'Turkish' : 'English'
-  const context = [locationLine(location), continuationLine(continuation)].filter(Boolean).join('\n\n')
+  const context_ = [
+    locationLine(location),
+    headingLine(context?.heading),
+    nearbyLine(context?.nearby),
+    hintLine(context?.hint),
+    continuationLine(continuation),
+  ]
+    .filter(Boolean)
+    .join('\n\n')
   return `Analyse this photograph and write a guide in ${languageName}.
 
-${context}
+${context_}
 
 Return one JSON object with exactly this shape:
 {
@@ -112,7 +150,11 @@ Rules:
 - Never mention that you are an AI or that this is a photograph analysis.`
 }
 
-export function buildChatPrompt(report: AttractionReport, language: GuideLanguage): string {
+export function buildChatPrompt(
+  report: AttractionReport,
+  language: GuideLanguage,
+  hasImage = true,
+): string {
   const oddityBlock = report.oddities?.length
     ? `\n\nOddities:\n${report.oddities.map((item) => `- ${item.title}: ${item.body}`).join('\n')}`
     : ''
@@ -132,5 +174,9 @@ ${report.trivia.map((item) => `- ${item.label} ${item.title}: ${item.body}`).joi
 Details:
 ${report.sections.map((section) => `- ${section.title}: ${section.body}`).join('\n')}${oddityBlock}${nextStepBlock}
 
-Answer follow-up questions in ${language === 'tr' ? 'Turkish' : 'English'}. Be concise (2–4 sentences unless asked for more), specific and warm. Never invent precise facts you are not confident about; if something is uncertain, say so. If the question relates to a visible detail, describe it directly.`
+Answer follow-up questions in ${language === 'tr' ? 'Turkish' : 'English'}. ${
+    hasImage
+      ? 'The original photograph is attached to the current question: use what is visible in it, and prefer the photo over the guide when they disagree. Point at concrete details ("the band of calligraphy above the door") rather than generic descriptions.'
+      : 'The photograph is not available in this conversation; answer from the guide above and say when you cannot see the detail.'
+  } Be concise (2–4 sentences unless asked for more), specific and warm. Never invent precise facts you are not confident about; if something is uncertain, say so. If the question is not about something visible, answer from the guide above.`
 }

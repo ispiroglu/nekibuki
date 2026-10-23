@@ -7,8 +7,21 @@ VISION_PROVIDER=mock
 GEMINI_API_KEY=
 
 # Any vision-capable Gemini model can be swapped in here
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-3.1-flash-lite
 
-# Used to verify Supabase access tokens at the edge (optional in mock mode)
-SUPABASE_URL=
-SUPABASE_ANON_KEY=
+# Optional: route Gemini through Cloudflare AI Gateway for logs and caching.
+# Use the full path, ending in /google-ai-studio/v1beta/models
+# AI_GATEWAY_URL=https://gateway.ai.cloudflare.com/v1/<account>/<gateway>/google-ai-studio/v1beta/models
+
+# Better Auth (Google OAuth). Generate the secret with:
+#   openssl rand -hex 32
+BETTER_AUTH_SECRET=
+BETTER_AUTH_URL=http://localhost:5173
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+# Authorised redirect URIs in Google Cloud:
+#   http://localhost:5173/api/auth/callback/google
+#   https://nekibuki.thecrafter.io/api/auth/callback/google
+
+# One-time guard for POST /api/auth/migrate. Remove it after the first run.
+MIGRATE_SECRET=

@@ -5,8 +5,8 @@ import { createRepository } from '@/lib/repo'
 import { useAppStore } from '@/store/app'
 
 export function useRepository() {
-  const { user, client } = useAuth()
-  return useMemo(() => (user ? createRepository(user, client) : null), [user, client])
+  const { user } = useAuth()
+  return useMemo(() => (user ? createRepository(user) : null), [user])
 }
 
 export function useHistory() {

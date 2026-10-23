@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/auth'
 import { spring } from '@/lib/motion'
 import { cn } from '@/lib/utils'
 import { usePreferences } from '@/store/preferences'
+import { useT } from '@/lib/ui-language'
 
 interface Slide {
   title: string
@@ -42,9 +43,10 @@ function ViewfinderArt() {
 /** One discovery: the photo, then the facts that come back with it. */
 function DiscoveryArt() {
   const reduceMotion = useReducedMotion()
+  const t = useT()
   const facts = [
-    { label: 'Opened', value: '80 AD' },
-    { label: 'Capacity', value: '~50,000' },
+    { label: t('Opened', 'Açılış'), value: t('80 AD', 'MS 80') },
+    { label: t('Capacity', 'Kapasite'), value: '~50,000' },
   ]
   return (
     <motion.div
@@ -81,6 +83,7 @@ function DiscoveryArt() {
 /** The conversation that stays attached to a place. */
 function ConversationArt() {
   const reduceMotion = useReducedMotion()
+  const t = useT()
   return (
     <div className="w-52 space-y-2 [@media(min-height:700px)]:space-y-3">
       <motion.p
@@ -89,7 +92,7 @@ function ConversationArt() {
         transition={reduceMotion ? { duration: 0 } : spring}
         className="ml-auto w-fit rounded-3xl rounded-br-lg bg-primary px-4 py-2 text-ui text-primary-foreground [@media(min-height:700px)]:py-2.5"
       >
-        Who built this?
+        {t('Who built this?', 'Bunu kim inşa etti?')}
       </motion.p>
       <motion.p
         initial={reduceMotion ? false : { opacity: 0, y: 10 }}
@@ -97,7 +100,7 @@ function ConversationArt() {
         transition={reduceMotion ? { duration: 0 } : { ...spring, delay: 0.16 }}
         className="font-serif text-reading leading-[1.7]"
       >
-        Genoese merchants, in 1348 — as the crown of their walled colony.
+        {t('Genoese merchants, in 1348 — as the crown of their walled colony.', 'Cenevizli tüccarlar, 1348\'de — surlarla çevrili kolonilerinin tacı olarak.')}
       </motion.p>
       <motion.p
         initial={reduceMotion ? false : { opacity: 0, x: 12 }}
@@ -105,38 +108,47 @@ function ConversationArt() {
         transition={reduceMotion ? { duration: 0 } : { ...spring, delay: 0.3 }}
         className="ml-auto w-fit rounded-3xl rounded-br-lg bg-primary px-4 py-2 text-ui text-primary-foreground [@media(min-height:700px)]:py-2.5"
       >
-        Can I go up at night?
+        {t('Can I go up at night?', 'Gece çıkabilir miyim?')}
       </motion.p>
     </div>
   )
 }
 
-const SLIDES: Slide[] = [
-  {
-    title: 'Point at anything',
-    body: 'A tower, a fountain, a carved doorway. Snap it or pick a photo — no typing, no searching.',
-    art: <ViewfinderArt />,
-  },
-  {
-    title: 'The story, not the plaque',
-    body: 'Every place arrives with a short guide written for you, plus four things worth remembering.',
-    art: <DiscoveryArt />,
-  },
-  {
-    title: 'Ask, and come back later',
-    body: 'Each discovery keeps its own conversation, so you can revisit the place and the question you left open.',
-    art: <ConversationArt />,
-  },
-]
-
 export function OnboardingScreen() {
   const { user } = useAuth()
+  const t = useT()
+  const slides: Slide[] = [
+    {
+      title: t('Point at anything', 'Herhangi bir şeye tut'),
+      body: t(
+        'A tower, a fountain, a carved doorway. Snap it or pick a photo — no typing, no searching.',
+        'Bir kule, bir çeşme, oymalı bir kapı. Çek ya da bir fotoğraf seç — yazmak yok, aramak yok.',
+      ),
+      art: <ViewfinderArt />,
+    },
+    {
+      title: t('The story, not the plaque', 'Tabela değil, hikâye'),
+      body: t(
+        'Every place arrives with a short guide written for you, plus four things worth remembering.',
+        'Her yer senin için yazılmış kısa bir rehberle ve hatırlamaya değer dört şeyle gelir.',
+      ),
+      art: <DiscoveryArt />,
+    },
+    {
+      title: t('Ask, and come back later', 'Sor, sonra geri dön'),
+      body: t(
+        'Each discovery keeps its own conversation, so you can revisit the place and the question you left open.',
+        'Her keşif kendi sohbetini saklar; böylece yeri ve açık bıraktığın soruyu yeniden ziyaret edebilirsin.',
+      ),
+      art: <ConversationArt />,
+    },
+  ]
   const completeOnboarding = usePreferences((state) => state.completeOnboarding)
   const reduceMotion = useReducedMotion()
   const [[index, direction], setIndex] = useState<[number, number]>([0, 1])
 
   const go = (next: number) => {
-    const clamped = Math.max(0, Math.min(SLIDES.length - 1, next))
+    const clamped = Math.max(0, Math.min(slides.length - 1, next))
     if (clamped === index) return
     setIndex([clamped, clamped > index ? 1 : -1])
   }
@@ -145,15 +157,15 @@ export function OnboardingScreen() {
     if (user) completeOnboarding(user.id)
   }
 
-  const slide = SLIDES[index]
-  const fullName = user?.name?.trim() || 'Traveler'
+  const slide = slides[index]
+  const fullName = user?.name?.trim() || t('Traveler', 'Gezgin')
   const firstName = fullName.split(/\s+/)[0]
 
   return (
     <div className="flex min-h-dvh flex-col overflow-x-hidden bg-background">
       <header className="flex shrink-0 items-center justify-between gap-3 px-5 py-1 safe-top sm:px-6">
         <p className="display flex min-w-0 items-baseline text-value text-brand-ink">
-          <span className="shrink-0">Welcome,&nbsp;</span>
+          <span className="shrink-0">{t('Welcome,', 'Hoş geldin,')}&nbsp;</span>
           <span className="min-w-0 truncate" title={fullName}>
             {firstName}.
           </span>
@@ -163,12 +175,12 @@ export function OnboardingScreen() {
           onClick={finish}
           className="-mr-2 inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center px-2 py-2 text-ui text-muted-foreground transition-colors active:text-foreground motion-reduce:transition-none"
         >
-          Skip
+          {t('Skip', 'Geç')}
         </button>
       </header>
 
       <p className="sr-only" aria-live="polite" aria-atomic="true">
-        Step {index + 1} of {SLIDES.length}: {slide.title}
+        {t('Step', 'Adım')} {index + 1} {t('of', '/')} {slides.length}: {slide.title}
       </p>
 
       <motion.div
@@ -207,12 +219,12 @@ export function OnboardingScreen() {
       </motion.div>
 
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-3 px-5 pt-2 safe-bottom sm:px-6">
-        <div className="flex items-center gap-1" role="group" aria-label="Onboarding steps">
-          {SLIDES.map((item, dotIndex) => (
+        <div className="flex items-center gap-1" role="group" aria-label={t('Onboarding steps', 'Tanıtım adımları')}>
+          {slides.map((item, dotIndex) => (
             <button
               key={item.title}
               type="button"
-              aria-label={`Step ${dotIndex + 1} of ${SLIDES.length}: ${item.title}`}
+              aria-label={t(`Step ${dotIndex + 1} of ${slides.length}: ${item.title}`, `Adım ${dotIndex + 1} / ${slides.length}: ${item.title}`)}
               aria-current={dotIndex === index ? 'step' : undefined}
               onClick={() => go(dotIndex)}
               className="grid min-h-11 min-w-11 place-items-center py-3.5"
@@ -229,10 +241,10 @@ export function OnboardingScreen() {
         </div>
         <button
           type="button"
-          onClick={() => (index === SLIDES.length - 1 ? finish() : go(index + 1))}
+          onClick={() => (index === slides.length - 1 ? finish() : go(index + 1))}
           className="h-14 w-full shrink-0 rounded-full bg-primary px-7 font-medium text-primary-foreground transition-transform duration-150 ease-out active:scale-[0.98] min-[360px]:w-auto motion-reduce:transition-none motion-reduce:active:scale-100"
         >
-          {index === SLIDES.length - 1 ? 'Start exploring' : 'Continue'}
+          {index === slides.length - 1 ? t('Start exploring', 'Keşfetmeye başla') : t('Continue', 'Devam')}
         </button>
       </div>
     </div>

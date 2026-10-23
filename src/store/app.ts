@@ -11,6 +11,8 @@ export interface CaptureContinuation {
 }
 
 export interface CaptureDraft {
+  /** Stable idempotency key: a retry reuses it and never archives twice. */
+  id: string
   blob: Blob
   previewUrl: string
   /**

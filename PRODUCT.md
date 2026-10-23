@@ -39,14 +39,15 @@ copy that mechanism.
 ## Capabilities and Constraints
 
 - Camera capture and gallery import, with torch, grid, zoom presets and a location chip.
-- Vision providers are swappable: Gemini 2.5 Flash or a deterministic mock used for demos and
-  offline previews. The default demo requires no keys or accounts.
+- Vision providers are swappable: Gemini 3.1 Flash-Lite or a deterministic mock used for demos
+  and offline previews. The default demo requires no keys or accounts.
 - Every report is validated against the zod schemas in `shared/schema.ts`; the contract requires
   exactly four trivia cards, a brief introduction, and detailed sections tied to visual references.
 - History supports search, saved-only filtering, deletion, and a per-place conversation.
-- Guide output is available in English and Turkish; the interface chrome is English.
+- The whole interface — chrome, headings and generated guide — is available in English and Turkish.
 - Appearance: light, dark, or follow the device. Haptics can be turned off.
-- Supabase auth and storage are optional; local IndexedDB is the default repository.
+- Better Auth (Google) with Cloudflare D1 and R2 is the hosted repository; local IndexedDB is
+  the zero-setup demo.
 
 ## Brand Commitments
 

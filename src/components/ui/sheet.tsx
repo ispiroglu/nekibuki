@@ -1,6 +1,7 @@
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from 'motion/react'
 import { X } from 'lucide-react'
 import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { useT } from '@/lib/ui-language'
 import { cn } from '@/lib/utils'
 
 interface SheetProps {
@@ -25,6 +26,7 @@ export function Sheet({
   footer,
   className,
 }: SheetProps) {
+  const t = useT()
   const reduceMotion = useReducedMotion()
   const dragControls = useDragControls()
   const titleId = useId()
@@ -111,7 +113,7 @@ export function Sheet({
             role="dialog"
             aria-modal="true"
             aria-labelledby={title ? titleId : undefined}
-            aria-label={title ? undefined : 'Conversation'}
+            aria-label={title ? undefined : t('Conversation', 'Sohbet')}
             tabIndex={-1}
             drag={reduceMotion ? false : 'y'}
             dragListener={false}
@@ -140,7 +142,7 @@ export function Sheet({
                 type="button"
                 onPointerDown={(event) => event.stopPropagation()}
                 onClick={() => onOpenChange(false)}
-                aria-label="Close"
+                aria-label={t('Close', 'Kapat')}
                 className="absolute right-4 top-3 grid size-11 place-items-center rounded-full bg-secondary text-foreground transition-transform duration-150 ease-out active:scale-95"
               >
                 <X className="size-4" />
