@@ -1,22 +1,66 @@
 {
-  "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "nekibuki",
-  "main": "worker/index.ts",
-  "compatibility_date": "2026-10-19",
-  "compatibility_flags": ["nodejs_compat"],
-  "routes": [{ "pattern": "nekibuki.thecrafter.io", "custom_domain": true }],
-  "assets": {
-    "directory": "./dist",
-    "binding": "ASSETS",
-    "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*"]
-  },
-  "observability": {
-    "enabled": true,
-    "head_sampling_rate": 1
-  },
-  "vars": {
-    "VISION_PROVIDER": "mock",
-    "GEMINI_MODEL": "gemini-2.5-flash"
-  }
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "nekibuki",
+	"main": "worker/index.ts",
+	"compatibility_date": "2026-10-23",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"routes": [
+		{
+			"pattern": "nekibuki.thecrafter.io",
+			"custom_domain": true
+		}
+	],
+	"assets": {
+		"directory": "./dist",
+		"binding": "ASSETS",
+		"not_found_handling": "single-page-application",
+		"run_worker_first": [
+			"/api/*"
+		]
+	},
+	"observability": {
+		"enabled": true,
+		"head_sampling_rate": 1
+	},
+	"vars": {
+		"VISION_PROVIDER": "gemini",
+		"GEMINI_MODEL": "gemini-3.1-flash-lite",
+		"WALK_MODEL": "@cf/qwen/qwen3.8-27b",
+		"WALK_PLANNER_MODEL": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+		"BETTER_AUTH_URL": "https://nekibuki.thecrafter.io"
+	},
+	"ai": {
+		"binding": "AI"
+	},
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "WALK_AGENT",
+				"class_name": "WalkAgent"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_sqlite_classes": [
+				"WalkAgent"
+			]
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "CAPTURES",
+			"bucket_name": "nekibuki-captures"
+		}
+	],
+	"d1_databases": [
+		{
+			"binding": "nekibuki",
+			"database_name": "nekibuki",
+			"database_id": "3f4cc93d-86ab-436d-89b7-1ffcd979e7c0"
+		}
+	]
 }

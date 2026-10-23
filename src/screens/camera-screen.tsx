@@ -31,6 +31,7 @@ import { haptic } from '@/lib/haptics'
 import { cn, clamp } from '@/lib/utils'
 import { useAppStore } from '@/store/app'
 import { usePreferences } from '@/store/preferences'
+import { useT } from '@/lib/ui-language'
 
 type CameraStatus = 'idle' | 'starting' | 'ready' | 'denied' | 'error'
 
@@ -101,7 +102,6 @@ const hudEdge = 'ring-1 ring-black/35'
  */
 const markSeparation = 'drop-shadow(0 0 1px rgb(0 0 0 / 0.7)) drop-shadow(0 1px 2px rgb(0 0 0 / 0.4))'
 
-const captureFailedMessage = "Couldn't grab that frame — try again."
 
 /** Long enough to be deliberate, short enough not to feel stuck. */
 const longPressMs = 420
@@ -175,6 +175,7 @@ export function CameraScreen({
   const zoomNoticeTimer = useRef<number | null>(null)
   const reduceMotion = useReducedMotion()
   const hapticsEnabled = usePreferences((state) => state.haptics)
+  const t = useT()
 
   const [status, setStatus] = useState<CameraStatus>('idle')
   const [restartToken, setRestartToken] = useState(0)
@@ -515,7 +516,7 @@ export function CameraScreen({
       return
     }
     const frame = window.requestAnimationFrame(() => {
-      setAnnouncement(`Next shot: ${pendingStep.title}. ${pendingStep.instruction}`)
+      setAnnouncement(t(`Next shot: ${pendingStep.title}. ${pendingStep.instruction}`, `Sıradaki kare: ${pendingStep.title}. ${pendingStep.instruction}`))
     })
     return () => window.cancelAnimationFrame(frame)
   }, [active, pendingStep])
@@ -530,7 +531,7 @@ export function CameraScreen({
     try {
       const blob = await captureVideoFrame(video)
       if (!blob) {
-        toast.error(captureFailedMessage)
+        toast.error(t("Couldn't grab that frame — try again.", 'O kare alınamadı — tekrar dene.'))
         return
       }
       haptic('medium', hapticsEnabled)
@@ -539,12 +540,12 @@ export function CameraScreen({
       onCapture(blob)
       consumePendingStep()
     } catch {
-      toast.error(captureFailedMessage)
+      toast.error(t("Couldn't grab that frame — try again.", 'O kare alınamadı — tekrar dene.'))
     } finally {
       capturingRef.current = false
       setCapturing(false)
     }
-  }, [consumePendingStep, hapticsEnabled, onCapture, status])
+  }, [consumePendingStep, hapticsEnabled, onCapture, status, t])
 
   const handlePreviewTap = useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {
@@ -724,12 +725,12 @@ export function CameraScreen({
 
   const locationLabel =
     locationStatus === 'requesting'
-      ? 'Locating'
+      ? t('Locating', 'Konum bulunuyor')
       : locationStatus === 'off' || locationStatus === 'disabled'
-        ? 'Location off'
+        ? t('Location off', 'Konum kapalı')
         : locationStatus === 'ready' && location
-          ? 'Location on'
-          : 'Add location'
+          ? t('Location on', 'Konum açık')
+          : t('Add location', 'Konum ekle')
 
   const handleLocationChip = () => {
     if (locationStatus === 'requesting') return
@@ -751,7 +752,7 @@ export function CameraScreen({
         must be the only heading on it. The camera has no visible title, so it
         carries a visually hidden one while it is the active panel.
       */}
-      {active && <h1 className="sr-only">Camera</h1>}
+      {active && <h1 className="sr-only">{t('Camera', 'Kamera')}</h1>}
 
       {/*
         The step arrives without anyone touching the camera, so it is
@@ -889,13 +890,13 @@ export function CameraScreen({
                 className="absolute inset-x-0 flex flex-col items-center gap-1"
                 style={{ top: 'calc(50% + 32%)' }}
               >
-                <p className="label-caps text-white/50">Pulling focus</p>
+                <p className="label-caps text-white/50">{t('Pulling focus', 'Odaklanıyor')}</p>
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   className="pointer-events-auto inline-flex min-h-11 items-center gap-1.5 text-sm text-white/55 [text-shadow:0_1px_2px_rgb(0_0_0_/_0.7)]"
                 >
-                  <ImageIcon className="size-3.5" /> Choose from gallery
+                  <ImageIcon className="size-3.5" /> {t('Choose from gallery', 'Galeriden seç')}
                 </button>
               </div>
             </motion.div>
@@ -940,7 +941,7 @@ export function CameraScreen({
         ) : null}
       </AnimatePresence>
       <span className="sr-only" role="status" aria-live="polite">
-        {zoomNotice ? `Zoom ${formatZoom(zoom)}` : ''}
+        {zoomNotice ? t(`Zoom ${formatZoom(zoom)}`, `Yakınlaştırma ${formatZoom(zoom)}`) : ''}
       </span>
 
       {/*
@@ -1025,7 +1026,7 @@ export function CameraScreen({
               }
               openSettings(event.detail === 0 ? 'key' : 'pointer')
             }}
-            aria-label="Viewfinder settings"
+            aria-label={t('Viewfinder settings', 'Vizör ayarları')}
             aria-haspopup="dialog"
             aria-expanded={settingsOpen}
             aria-controls={settingsOpen ? settingsPanelId : undefined}
@@ -1069,7 +1070,7 @@ export function CameraScreen({
                     ref={locationMenuRef}
                     id={locationMenuId}
                     role="menu"
-                    aria-label="Location options"
+                    aria-label={t('Location options', 'Konum seçenekleri')}
                     onKeyDown={handleLocationMenuKeyDown}
                     initial={reduceMotion ? false : { opacity: 0, y: -6, scale: 0.98 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -1094,7 +1095,7 @@ export function CameraScreen({
                       className="flex min-h-[44px] items-center gap-2 whitespace-nowrap px-[12px] text-white/90 transition-colors active:bg-white/10 focus-visible:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white/70"
                     >
                       <RefreshCw className="size-4" />
-                      Refresh location
+                      {t('Refresh location', 'Konumu yenile')}
                     </button>
                     <button
                       ref={(element) => {
@@ -1110,7 +1111,7 @@ export function CameraScreen({
                       className="flex min-h-[44px] items-center gap-2 whitespace-nowrap border-t border-white/10 px-[12px] text-white/90 transition-colors active:bg-white/10 focus-visible:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white/70"
                     >
                       <MapPinOff className="size-4 text-hud" />
-                      Turn off location
+                      {t('Turn off location', 'Konumu kapat')}
                     </button>
                   </motion.div>
                 )}
@@ -1121,7 +1122,7 @@ export function CameraScreen({
           <button
             type="button"
             onClick={onOpenHistory}
-            aria-label="Open places"
+            aria-label={t('Open places', 'Yerleri aç')}
             className={cn(
               'glass-dark-live pointer-events-auto grid size-[44px] shrink-0 place-items-center rounded-full text-white transition-transform duration-150 ease-out active:scale-95',
               hudEdge,
@@ -1167,14 +1168,14 @@ export function CameraScreen({
                 >
                   <div className="flex items-start justify-between gap-[8px]">
                     <p className="label-caps min-w-0 flex-1 truncate pt-[14px] text-white/90">
-                      Next shot
+                      {t('Next shot', 'Sıradaki kare')}
                     </p>
                     <button
                       type="button"
                       onClick={dismissPendingStep}
                       className="-mr-[4px] inline-flex min-h-[44px] shrink-0 items-center rounded-full border border-white/25 px-[12px] text-ui text-white transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
                     >
-                      Not now
+                      {t('Not now', 'Şimdi değil')}
                     </button>
                   </div>
                   <p className="display mt-[2px] truncate text-lede text-white">
@@ -1193,7 +1194,7 @@ export function CameraScreen({
                   transition={{ duration: reduceMotion ? 0 : 0.18, ease: 'easeOut' }}
                   className="glass-dark-live pointer-events-none mx-auto w-fit max-w-full truncate rounded-full px-[12px] py-[4px] text-xs font-medium text-white"
                 >
-                  Point at one thing
+                  {t('Point at one thing', 'Tek bir şeye tut')}
                 </motion.p>
               )}
             </AnimatePresence>
@@ -1291,7 +1292,7 @@ export function CameraScreen({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              aria-label="Choose from gallery"
+              aria-label={t('Choose from gallery', 'Galeriden seç')}
               className={cn(
                 'glass-dark-live pointer-events-auto grid size-[48px] shrink-0 place-items-center overflow-hidden rounded-xl text-white transition-transform duration-150 ease-out active:scale-95',
                 hudEdge,
@@ -1307,7 +1308,8 @@ export function CameraScreen({
               transition={{ type: 'spring', bounce: 0.2, duration: 0.3 }}
               disabled={status !== 'ready' || capturing}
               aria-busy={capturing}
-              aria-label="Take a photo"
+              aria-label={t('Take a photo', 'Fotoğraf çek')}
+              data-shutter
               className={cn(
                 'pointer-events-auto grid size-[80px] shrink-0 place-items-center rounded-full border-[3px] border-white/90 ring-2 ring-black/25',
                 capturing ? 'opacity-60' : 'disabled:opacity-40',
@@ -1322,7 +1324,7 @@ export function CameraScreen({
                 setFacing((value) => (value === 'environment' ? 'user' : 'environment'))
                 haptic('light', hapticsEnabled)
               }}
-              aria-label="Switch camera"
+              aria-label={t('Switch camera', 'Kamerayı değiştir')}
               className={cn(
                 'glass-dark-live pointer-events-auto grid size-[48px] shrink-0 place-items-center rounded-xl text-white transition-transform duration-150 ease-out active:scale-95',
                 hudEdge,
@@ -1376,15 +1378,15 @@ export function CameraScreen({
 
             <div className="space-y-2">
               <h2 id="camera-status-title" className="display text-2xl text-white">
-                {status === 'denied' ? 'Camera access is off' : 'The camera did not start'}
+                {status === 'denied' ? t('Camera access is off', 'Kamera erişimi kapalı') : t('The camera did not start', 'Kamera başlatılamadı')}
               </h2>
               <p
                 id="camera-status-body"
                 className="mx-auto max-w-xs text-base leading-relaxed text-white/85"
               >
                 {status === 'denied'
-                  ? 'Nekibuki needs the camera to look at the place in front of you.'
-                  : 'Something interrupted the camera before it could start.'}
+                  ? t('Nekibuki needs the camera to look at the place in front of you.', 'Nekibuki\'nin önündeki yere bakabilmesi için kameraya ihtiyacı var.')
+                  : t('Something interrupted the camera before it could start.', 'Kamera başlamadan önce bir şey onu durdurdu.')}
               </p>
             </div>
 
@@ -1395,7 +1397,7 @@ export function CameraScreen({
                 onClick={() => fileInputRef.current?.click()}
               >
                 <ImageIcon className="size-4" />
-                Choose from gallery
+                {t('Choose from gallery', 'Galeriden seç')}
               </Button>
 
               {status === 'denied' ? (
@@ -1407,7 +1409,7 @@ export function CameraScreen({
                     onClick={() => setHelpOpen((value) => !value)}
                     className="inline-flex min-h-11 items-center justify-center gap-1 text-sm text-white/85 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
                   >
-                    How to enable the camera
+                    {t('How to enable the camera', 'Kamera nasıl açılır')}
                     <ChevronDown
                       aria-hidden
                       className={cn(
@@ -1427,8 +1429,8 @@ export function CameraScreen({
                         className="rounded-2xl bg-white/10 px-4 py-3 text-left text-sm leading-relaxed text-white/85"
                       >
                         {cameraPermission === 'denied'
-                          ? 'Open your browser’s site settings from the camera icon beside the address, set Camera to Allow, then '
-                          : 'Allow camera access when your browser asks. If no prompt appears, check the camera icon beside the address, then '}
+                          ? t('Open your browser’s site settings from the camera icon beside the address, set Camera to Allow, then ', 'Adres çubuğunun yanındaki kamera simgesinden tarayıcı site ayarlarını aç, Kamerayı İzin Ver yap, sonra ')
+                          : t('Allow camera access when your browser asks. If no prompt appears, check the camera icon beside the address, then ', 'Tarayıcı sorduğunda kamera erişimine izin ver. İstem çıkmazsa adres çubuğunun yanındaki kamera simgesini kontrol et, sonra ')}
                         <button
                           type="button"
                           onClick={() => {
@@ -1440,7 +1442,7 @@ export function CameraScreen({
                           }}
                           className="font-medium text-white underline decoration-white/40 underline-offset-4 transition-colors hover:decoration-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
                         >
-                          {cameraPermission === 'denied' ? 'reload the page' : 'try again'}
+                          {cameraPermission === 'denied' ? t('reload the page', 'sayfayı yenile') : t('try again', 'tekrar dene')}
                         </button>
                         .
                       </motion.div>
@@ -1453,7 +1455,7 @@ export function CameraScreen({
                   onClick={() => setRestartToken((value) => value + 1)}
                   className="inline-flex min-h-11 items-center justify-center gap-1.5 text-sm text-white/85 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
                 >
-                  <RefreshCw className="size-3.5" /> Retry camera
+                  <RefreshCw className="size-3.5" /> {t('Retry camera', 'Kamerayı yeniden dene')}
                 </button>
               )}
             </div>

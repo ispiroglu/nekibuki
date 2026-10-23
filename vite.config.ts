@@ -58,46 +58,25 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,jpg,jpeg,webp,woff2}'],
-        // The first visit on a weak connection should not pay for code and
-        // glyphs the browser never asks for:
-        // - the Supabase client is behind a lazy `import()` and is only fetched
-        //   when Supabase auth is enabled (it is cached at runtime instead),
-        // - the Newsreader `latin-ext` and `vietnamese` subsets are gated by
-        //   `unicode-range` and are only requested for those scripts.
+        // The first visit on a weak connection should not pay for glyphs the
+        // browser never asks for: the Newsreader `latin-ext` and `vietnamese`
+        // subsets are gated by `unicode-range` and only requested for those
+        // scripts.
         globIgnores: [
-          '**/assets/supabase-*.js',
           '**/assets/newsreader-latin-ext-*.woff2',
           '**/assets/newsreader-vietnamese-*.woff2',
         ],
         navigateFallback: '/index.html',
+        // User photos and history come from /api and must never be precached.
         navigateFallbackDenylist: [/^\/api\//],
         cleanupOutdatedCaches: true,
         runtimeCaching: [
-          {
-            urlPattern: /\/assets\/supabase-[^/]+\.js$/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'app-chunks',
-              expiration: { maxEntries: 4, maxAgeSeconds: 60 * 60 * 24 * 30 },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
           {
             urlPattern: /^https:\/\/images\.unsplash\.com\/.*/i,
             handler: 'CacheFirst',
             options: {
               cacheName: 'remote-images',
               expiration: { maxEntries: 80, maxAgeSeconds: 60 * 60 * 24 * 30 },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-          {
-            urlPattern:
-              /^https:\/\/[a-z0-9-]+\.supabase\.co\/storage\/v1\/object\/public\/.*/i,
-            handler: 'StaleWhileRevalidate',
-            options: {
-              cacheName: 'supabase-images',
-              expiration: { maxEntries: 120, maxAgeSeconds: 60 * 60 * 24 * 30 },
               cacheableResponse: { statuses: [0, 200] },
             },
           },
@@ -132,22 +111,11 @@ export default defineConfig({
           groups: [
             {
               // The TypeScript helpers are shared with the app chunks, so they
-              // keep their own chunk: nothing in the app may depend on the
-              // Supabase chunk.
+              // keep their own chunk.
               name: 'tslib',
               test: /node_modules[\\/]tslib[\\/]/,
               priority: 20,
               includeDependenciesRecursively: false,
-            },
-            {
-              // The Supabase client is behind a lazy `import()` and is never
-              // fetched in the default local-first mode. Naming the chunk keeps
-              // it addressable, so the service worker can leave it out of the
-              // precache and cache it at runtime instead.
-              name: 'supabase',
-              test: /node_modules[\\/]@supabase[\\/]/,
-              priority: 10,
-              includeDependenciesRecursively: true,
             },
           ],
         },

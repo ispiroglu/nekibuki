@@ -93,6 +93,10 @@ check('photo annotations rendered', markers >= 4 || dots >= 4, `${markers} marke
 const matchChip = await page.getByText(/confidence|%\s*match/i).count()
 check('confidence chip rendered', matchChip > 0)
 
+// Every report offers a tour now, not only the places with a hand-written plan.
+const walkCta = await page.getByRole('button', { name: /Start the walk|Continue the walk/i }).count()
+check('walk CTA rendered for the report', walkCta > 0)
+
 // ----------------------------------------------------------------------- chat
 await page.getByRole('button', { name: /Ask about/ }).first().click()
 await page.waitForTimeout(1500)

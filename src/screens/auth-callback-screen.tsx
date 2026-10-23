@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Logo } from '@/components/brand/logo'
 import { useAuth } from '@/lib/auth'
+import { useT, useUiLanguage } from '@/lib/ui-language'
 import {
   describeOAuthFailure,
   readOAuthError,
@@ -10,6 +11,8 @@ import {
 
 export function AuthCallbackScreen() {
   const { user, loading, signIn, error } = useAuth()
+  const language = useUiLanguage()
+  const t = useT()
   const navigate = useNavigate()
   const [oauth] = useState(() => readOAuthError())
 
@@ -20,15 +23,18 @@ export function AuthCallbackScreen() {
   const failed = !loading && !user
 
   const failure: OAuthFailure = oauth
-    ? describeOAuthFailure(oauth.code)
+    ? describeOAuthFailure(oauth.code, language)
     : error
       ? {
-          title: 'Sign-in didn’t start.',
-          hint: 'Check your connection, then try again.',
+          title: t('Sign-in didn’t start.', 'Giriş başlamadı.'),
+          hint: t('Check your connection, then try again.', 'Bağlantını kontrol edip tekrar dene.'),
         }
       : {
-          title: 'We couldn’t sign you in.',
-          hint: 'The sign-in link may have expired. Try again, or head back to the start.',
+          title: t('We couldn’t sign you in.', 'Giriş yapamadık.'),
+          hint: t(
+            'The sign-in link may have expired. Try again, or head back to the start.',
+            'Giriş bağlantısının süresi dolmuş olabilir. Tekrar dene ya da başlangıca dön.',
+          ),
         }
 
   return (
@@ -45,14 +51,14 @@ export function AuthCallbackScreen() {
             onClick={() => void signIn()}
             className="mt-2 flex h-14 w-full items-center justify-center rounded-full bg-primary px-5 font-medium text-primary-foreground transition-transform duration-150 ease-out active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100"
           >
-            Try signing in again
+            {t('Try signing in again', 'Tekrar giriş yapmayı dene')}
           </button>
           <Link
             to="/"
             replace
             className="inline-flex min-h-11 items-center justify-center rounded-full px-4 text-sm font-medium text-muted-foreground transition-colors active:text-foreground motion-reduce:transition-none"
           >
-            Back to the start
+            {t('Back to the start', 'Başlangıca dön')}
           </Link>
         </div>
       ) : (
@@ -62,9 +68,9 @@ export function AuthCallbackScreen() {
           className="flex w-full max-w-xs flex-col items-center gap-4 text-center"
         >
           <Logo className="size-16 animate-breathe text-foreground" />
-          <h1 className="display text-2xl">Signing you in…</h1>
+          <h1 className="display text-2xl">{t('Signing you in…', 'Giriş yapılıyor…')}</h1>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Hold on while we bring your discoveries back.
+            {t('Hold on while we bring your discoveries back.', 'Keşiflerini geri getirirken biraz bekle.')}
           </p>
         </div>
       )}

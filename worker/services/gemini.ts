@@ -152,16 +152,21 @@ export class GeminiProvider implements VisionProvider {
   readonly name = 'gemini' as const
   readonly model: string
   private readonly apiKey: string
+  private readonly apiRoot: string
 
-  constructor(apiKey: string, model = 'gemini-2.5-flash') {
+  constructor(apiKey: string, model = 'gemini-3.1-flash-lite', gatewayUrl?: string) {
     this.apiKey = apiKey
     this.model = model
+    // AI Gateway is optional: when AI_GATEWAY_URL is set, the same Gemini
+    // payload goes through Cloudflare for logs and caching; otherwise the
+    // Worker talks to Google directly.
+    this.apiRoot = (gatewayUrl?.trim() || API_ROOT).replace(/\/+$/, '')
   }
 
   private async call(body: unknown): Promise<GeminiResponse> {
     let response: Response
     try {
-      response = await fetch(`${API_ROOT}/${this.model}:generateContent`, {
+      response = await fetch(`${this.apiRoot}/${this.model}:generateContent`, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -228,7 +233,11 @@ export class GeminiProvider implements VisionProvider {
   }
 
   async analyze(input: VisionInput): Promise<AttractionReport> {
-    const prompt = buildAnalyzePrompt(input.language, input.location, input.continuation)
+    const prompt = buildAnalyzePrompt(input.language, input.location, input.continuation, {
+      heading: input.heading,
+      nearby: input.nearby,
+      hint: input.hint,
+    })
 
     const payload = await this.call({
       systemInstruction: {
@@ -287,6 +296,7 @@ export class GeminiProvider implements VisionProvider {
     history: { role: 'user' | 'assistant'; content: string }[]
     question: string
     language: GuideLanguage
+    image?: { data: ArrayBuffer; mimeType: string }
   }): Promise<string> {
     const history = input.history
       .slice(-12)
@@ -297,14 +307,24 @@ export class GeminiProvider implements VisionProvider {
 
     while (history.length && history[0].role === 'model') history.shift()
 
+    // The archived photo travels with the current question, so the model can
+    // answer about a detail it can actually see instead of the report alone.
+    const parts: ({ text: string } | { inlineData: { mimeType: string; data: string } })[] = []
+    if (input.image) {
+      parts.push({
+        inlineData: {
+          mimeType: input.image.mimeType,
+          data: arrayBufferToBase64(input.image.data),
+        },
+      })
+    }
+    parts.push({ text: input.question })
+
     const payload = await this.call({
       systemInstruction: {
-        parts: [{ text: buildChatPrompt(input.report, input.language) }],
+        parts: [{ text: buildChatPrompt(input.report, input.language, Boolean(input.image)) }],
       },
-      contents: [
-        ...history,
-        { role: 'user', parts: [{ text: input.question }] },
-      ],
+      contents: [...history, { role: 'user', parts }],
       generationConfig: {
         temperature: 0.6,
         topP: 0.95,

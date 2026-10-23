@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useRepository } from '@/hooks/use-history'
 import { useAppStore } from '@/store/app'
 import { useLocationStore } from '@/store/location'
+import { useT } from '@/lib/ui-language'
 
 /**
  * The panels take an optional `active` flag: the panel in front keeps its `h1`,
@@ -57,6 +58,7 @@ export function Shell() {
   const locationStatus = useLocationStore((state) => state.status)
   const requestLocation = useLocationStore((state) => state.request)
   const repository = useRepository()
+  const t = useT()
 
   // Only `idle` (a fresh store / first mount) auto-requests. After a deliberate
   // opt-out the store is `disabled`, and this effect must leave it alone.
@@ -95,6 +97,7 @@ export function Shell() {
         : undefined
 
       setCapture({
+        id: crypto.randomUUID(),
         blob,
         previewUrl: URL.createObjectURL(blob),
         ...(continuation ? { continuation } : {}),
@@ -157,7 +160,7 @@ export function Shell() {
       <SwipeHint />
 
       <nav
-        aria-label="Panels"
+        aria-label={t('Panels', 'Paneller')}
         className="pointer-events-none absolute inset-x-0 bottom-0 z-40 flex justify-center pb-[max(0.6rem,env(safe-area-inset-bottom))]"
       >
         <PageDots

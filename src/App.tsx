@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { BrowserRouter } from 'react-router-dom'
 import { AppearanceSync } from '@/components/layout/appearance-sync'
+import { LanguageSync } from '@/lib/ui-language'
 import { CaptureController } from '@/components/capture/capture-controller'
 import { Shell } from '@/components/layout/shell'
 import { SplashScreen } from '@/components/layout/splash'
@@ -15,6 +16,10 @@ import { usePreferences } from '@/store/preferences'
 
 const ReportScreen = lazy(() =>
   import('@/screens/report-screen').then((module) => ({ default: module.ReportScreen })),
+)
+
+const WalkScreen = lazy(() =>
+  import('@/screens/walk-screen').then((module) => ({ default: module.WalkScreen })),
 )
 
 /** The legal pages are readable by anyone, signed in or not. */
@@ -42,6 +47,22 @@ function ReportRoute() {
   )
 }
 
+function WalkRoute() {
+  const mainRef = useRef<HTMLElement>(null)
+
+  useEffect(() => {
+    mainRef.current?.focus({ preventScroll: true })
+  }, [])
+
+  return (
+    <main ref={mainRef} tabIndex={-1} className="min-h-dvh bg-background focus:outline-none">
+      <Suspense fallback={<SplashScreen />}>
+        <WalkScreen />
+      </Suspense>
+    </main>
+  )
+}
+
 function Screens() {
   const { user, loading } = useAuth()
   const onboarded = usePreferences((state) => state.onboarded)
@@ -60,6 +81,7 @@ function Screens() {
       <Routes>
         <Route path="/" element={<Shell />} />
         <Route path="/report/:id" element={<ReportRoute />} />
+        <Route path="/walk/:id" element={<WalkRoute />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
@@ -71,6 +93,7 @@ export function App() {
     <AuthProvider>
       <BrowserRouter>
         <AppearanceSync />
+        <LanguageSync />
         <div className="min-h-dvh">
           <Screens />
         </div>

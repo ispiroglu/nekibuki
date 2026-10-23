@@ -119,10 +119,13 @@ export interface Analysis {
   language: GuideLanguage
   messages: ChatMessage[]
   saved: boolean
-  /** Full-size image URL (blob URL for local captures). */
+  /** Full-size image URL (blob URL for local captures, /api/... when remote). */
   imageUrl: string
   /** Small image for lists. */
   previewUrl: string
+  /** Which model wrote the guide. Present only for remote captures. */
+  provider?: string
+  model?: string
 }
 
 export interface NewAnalysis {
@@ -134,6 +137,11 @@ export interface NewAnalysis {
 
 export interface AnalyzeResponse {
   report: AttractionReport
+  /**
+   * The stored capture, when the Worker persisted it. Absent in demo mode,
+   * where the traveller's own IndexedDB is the only repository.
+   */
+  analysis?: Analysis
   meta?: {
     provider: 'gemini' | 'mock'
     model?: string

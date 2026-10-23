@@ -34,6 +34,7 @@ export class MockVisionProvider implements VisionProvider {
     history: { role: 'user' | 'assistant'; content: string }[]
     question: string
     language: GuideLanguage
+    image?: { data: ArrayBuffer; mimeType: string }
   }): Promise<string> {
     await wait(750 + Math.random() * 500)
     return mockChatAnswer(input.report, input.question)

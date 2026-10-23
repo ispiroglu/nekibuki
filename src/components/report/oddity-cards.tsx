@@ -1,4 +1,5 @@
 import type { Oddity } from '@shared/types'
+import { useT } from '@/lib/ui-language'
 
 /**
  * The strange-but-true notes.
@@ -11,15 +12,16 @@ import type { Oddity } from '@shared/types'
  * be mistaken for the trivia cards above them.
  */
 export function OddityCards({ oddities }: { oddities?: Oddity[] }) {
+  const t = useT()
   // A guide written before this field existed has no oddities at all, and the
   // section has to disappear rather than leave a heading with nothing under it.
   if (!oddities || oddities.length === 0) return null
 
   return (
     <section>
-      <h2 className="text-title font-medium tracking-[-0.01em]">Odd but true</h2>
+      <h2 className="text-title font-medium tracking-[-0.01em]">{t('Odd but true', 'Tuhaf ama gerçek')}</h2>
       <p className="mt-3 max-w-[32rem] text-body leading-relaxed text-muted-foreground [text-wrap:pretty]">
-        What a local would tell you if you asked.
+        {t('What a local would tell you if you asked.', 'Bir yerliye sorsan sana anlatacağı şeyler.')}
       </p>
 
       {/*

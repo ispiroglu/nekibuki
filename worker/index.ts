@@ -2,9 +2,24 @@ import { chatRequestSchema, geoPointSchema } from '@shared/schema'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
-import type { AttractionReport, GuideLanguage } from '@shared/types'
-import { GeminiProvider } from './services/gemini'
-import { MockVisionProvider } from './services/mock'
+import { getMigrations } from 'better-auth/db/migration'
+import type { Analysis, AttractionReport, GuideLanguage } from '@shared/types'
+import { authConfigured, authReady, createAuth } from './auth'
+import {
+  bumpUsage,
+  dailyLimits,
+  findCapture,
+  imageUrl,
+  insertAnalysis,
+  keysFor,
+  readUsage,
+  toAnalysis,
+} from './lib/analyses'
+import { nearbyPlaces } from './lib/nearby'
+import { requireUser, withSession, type AuthContext } from './lib/session'
+import { analyses } from './routes/analyses'
+import { walks } from './routes/walks'
+import { providerFor } from './services/provider'
 import {
   ProviderError,
   type AppEnv,
@@ -13,9 +28,10 @@ import {
   type VisionProvider,
 } from './types'
 
-const app = new Hono<{ Bindings: AppEnv }>()
+const app = new Hono<AuthContext>()
 
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024
+const MAX_CHAT_IMAGE_BYTES = 2 * 1024 * 1024
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'])
 
 /**
@@ -41,6 +57,12 @@ export type ApiErrorCode =
   | 'provider_error'
   | 'analysis_failed'
   | 'chat_failed'
+  | 'walk_failed'
+  | 'walk_unavailable'
+  | 'walk_location_required'
+  | 'walk_map_unavailable'
+  | 'walk_too_few_places'
+  | 'walk_plan_failed'
   | 'internal'
 
 /** Codes implied by the HTTP status of a plain `HTTPException`. */
@@ -68,6 +90,12 @@ const PROVIDER_ERROR_CODES = new Set<ApiErrorCode>([
   'invalid_json',
   'invalid_report',
   'provider_error',
+  'walk_failed',
+  'walk_unavailable',
+  'walk_location_required',
+  'walk_map_unavailable',
+  'walk_too_few_places',
+  'walk_plan_failed',
 ])
 
 function codeForStatus(status: number): ApiErrorCode {
@@ -76,49 +104,6 @@ function codeForStatus(status: number): ApiErrorCode {
 
 function codeForProvider(code: string): ApiErrorCode {
   return PROVIDER_ERROR_CODES.has(code as ApiErrorCode) ? (code as ApiErrorCode) : 'internal'
-}
-
-function providerFor(env: AppEnv): VisionProvider {
-  const configured = (env.VISION_PROVIDER as string | undefined)?.toLowerCase()
-  if (configured === 'gemini') {
-    if (!env.GEMINI_API_KEY) {
-      throw new ProviderError(
-        'Vision is not configured yet. Add GEMINI_API_KEY to the worker secrets.',
-        'missing_key',
-        503,
-      )
-    }
-    return new GeminiProvider(env.GEMINI_API_KEY, env.GEMINI_MODEL || 'gemini-2.5-flash')
-  }
-  return new MockVisionProvider()
-}
-
-/**
- * When Supabase is configured, every vision call must carry a valid user token.
- * In demo/mock mode the API stays open so the flow works without setup.
- */
-async function requireUser(env: AppEnv, authorization: string | undefined): Promise<void> {
-  if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) return
-  if (!authorization?.startsWith('Bearer ')) {
-    throw new HTTPException(401, { message: 'Sign in to use the guide.' })
-  }
-
-  const response = await fetch(`${env.SUPABASE_URL.replace(/\/$/, '')}/auth/v1/user`, {
-    headers: {
-      apikey: env.SUPABASE_ANON_KEY,
-      authorization,
-    },
-  }).catch(() => null)
-
-  if (!response) {
-    // The session could not be checked at all: that is a network failure, not
-    // an expired session, and the traveller should not be asked to sign in.
-    throw new HTTPException(503, { message: 'Could not confirm your session right now. Try again.' })
-  }
-
-  if (!response.ok) {
-    throw new HTTPException(401, { message: 'Your session expired. Sign in again.' })
-  }
 }
 
 function languageFrom(value: FormDataEntryValue | null): GuideLanguage {
@@ -206,17 +191,82 @@ async function chatWith(
   }
 }
 
+// ─────────────────────────────────────────────────────────────
+// Auth
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * One-time schema creation for Better Auth's own tables. D1 cannot be reached
+ * by the Better Auth CLI, so the migration runs inside the Worker. Guarded by
+ * MIGRATE_SECRET and safe to leave undeployed once the tables exist.
+ */
+app.post('/api/auth/migrate', async (c) => {
+  const secret = c.env.MIGRATE_SECRET
+  if (!secret || c.req.header('x-migrate-secret') !== secret) {
+    return c.json({ error: 'Not found', code: 'not_found' }, 404)
+  }
+  if (!authReady(c.env)) {
+    return c.json({ error: 'Auth is not configured.', code: 'internal' }, 503)
+  }
+
+  try {
+    const auth = createAuth(c.env)
+    const { toBeCreated, toBeAdded, runMigrations } = await getMigrations(auth.options)
+    if (toBeCreated.length === 0 && toBeAdded.length === 0) {
+      return c.json({ message: 'No migrations needed' })
+    }
+    await runMigrations()
+    return c.json({
+      message: 'Migrations completed',
+      created: toBeCreated.map((table) => table.table),
+      added: toBeAdded.map((table) => table.table),
+    })
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        level: 'error',
+        message: 'Auth migration failed',
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    )
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Migration failed', code: 'internal' },
+      500,
+    )
+  }
+})
+
+app.all('/api/auth/*', (c) => {
+  if (!authConfigured(c.env)) {
+    return c.json({ error: 'Accounts are not configured on this deployment.', code: 'internal' }, 503)
+  }
+  return createAuth(c.env).handler(c.req.raw)
+})
+
+// ─────────────────────────────────────────────────────────────
+// Health
+// ─────────────────────────────────────────────────────────────
+
 app.get('/api/health', (c) =>
   c.json({
     ok: true,
     provider: c.env.VISION_PROVIDER ?? 'mock',
-    model: c.env.GEMINI_MODEL ?? 'gemini-2.5-flash',
-    auth: Boolean(c.env.SUPABASE_URL && c.env.SUPABASE_ANON_KEY),
+    model: c.env.GEMINI_MODEL ?? 'gemini-3.1-flash-lite',
+    auth: authConfigured(c.env),
+    db: Boolean(c.env.nekibuki),
+    storage: Boolean(c.env.CAPTURES),
+    walk: Boolean(c.env.WALK_AGENT && c.env.AI),
   }),
 )
 
+// ─────────────────────────────────────────────────────────────
+// Analyse
+// ─────────────────────────────────────────────────────────────
+
+app.use('/api/analyze', withSession)
+
 app.post('/api/analyze', async (c) => {
-  await requireUser(c.env, c.req.header('authorization'))
+  const user = c.get('authEnabled') ? requireUser(c) : null
 
   const contentType = c.req.header('content-type') ?? ''
   if (!contentType.includes('multipart/form-data')) {
@@ -241,6 +291,12 @@ app.post('/api/analyze', async (c) => {
     throw new HTTPException(415, { message: 'Use a JPEG, PNG or WebP photo.' })
   }
 
+  const chatImage = form.get('chatImage')
+  const chatFile = chatImage instanceof File ? chatImage : null
+  if (chatFile && chatFile.size > MAX_CHAT_IMAGE_BYTES) {
+    throw new HTTPException(413, { message: 'The chat copy of the photo is too large.' })
+  }
+
   let location: { latitude: number; longitude: number; accuracy?: number } | undefined
   const rawLocation = form.get('location')
   if (typeof rawLocation === 'string' && rawLocation.trim()) {
@@ -252,21 +308,166 @@ app.post('/api/analyze', async (c) => {
     }
   }
 
+  const rawHeading = form.get('heading')
+  const heading =
+    typeof rawHeading === 'string' && rawHeading.trim() && Number.isFinite(Number(rawHeading))
+      ? Number(rawHeading)
+      : undefined
+
+  const rawHint = form.get('hint')
+  const hint = typeof rawHint === 'string' && rawHint.trim() ? rawHint.trim().slice(0, 120) : undefined
+
   const language = languageFrom(form.get('language'))
   const continuation = continuationFrom(form.get('continuation'))
+  const captureId =
+    typeof form.get('captureId') === 'string' && (form.get('captureId') as string).trim()
+      ? (form.get('captureId') as string).trim()
+      : crypto.randomUUID()
+
+  // A retried request must not call the model twice or archive two photos.
+  if (user) {
+    const existing = await findCapture(c.env.nekibuki, user.id, captureId)
+    if (existing) {
+      return c.json(
+        {
+          report: JSON.parse(existing.report) as AttractionReport,
+          analysis: toAnalysis(existing),
+          meta: {
+            provider: existing.provider === 'gemini' ? 'gemini' : 'mock',
+            model: existing.model ?? undefined,
+            processingMs: 0,
+          },
+        },
+        200,
+        { 'cache-control': 'no-store' },
+      )
+    }
+
+    const limits = dailyLimits(c.env)
+    const usage = await readUsage(c.env.nekibuki, user.id)
+    if (usage.analyses >= limits.analyses) {
+      throw new HTTPException(429, {
+        message: 'You have reached today’s guide limit. It resets at midnight UTC.',
+      })
+    }
+  }
+
+  const imageData = await image.arrayBuffer()
+  const nearby = await nearbyPlaces(location, language)
   const provider = providerFor(c.env)
   const started = Date.now()
   const report = await analyzeWith(provider, {
-    image: await image.arrayBuffer(),
+    image: imageData,
     mimeType: image.type,
     location,
+    heading,
+    nearby,
+    hint,
     language,
     continuation,
   })
 
+  let analysis: Analysis | undefined
+  if (user) {
+    if (!c.env.CAPTURES) {
+      throw new HTTPException(503, {
+        message: 'Photo storage is not configured on this deployment yet.',
+      })
+    }
+
+    const id = crypto.randomUUID()
+    const hasChat = Boolean(chatFile)
+    const keys = keysFor(user.id, id, hasChat)
+    const now = Date.now()
+
+    const photoBytes = imageData
+    const chatBytes = chatFile ? await chatFile.arrayBuffer() : null
+
+    try {
+      await c.env.CAPTURES.put(keys.photo, photoBytes, {
+        httpMetadata: { contentType: image.type || 'image/jpeg' },
+      })
+      if (keys.chat && chatBytes) {
+        await c.env.CAPTURES.put(keys.chat, chatBytes, {
+          httpMetadata: { contentType: chatFile?.type || 'image/jpeg' },
+        })
+      }
+
+      const inserted = await insertAnalysis(c.env.nekibuki, {
+        id,
+        userId: user.id,
+        captureId,
+        report,
+        location,
+        language,
+        imageKey: keys.photo,
+        chatKey: keys.chat,
+        provider: provider.name,
+        model: provider.model,
+        now,
+      })
+
+      if (!inserted) {
+        // Another request won the race; drop this copy and return theirs.
+        await c.env.CAPTURES.delete(
+          [keys.photo, keys.chat].filter((key): key is string => Boolean(key)),
+        )
+        const existing = await findCapture(c.env.nekibuki, user.id, captureId)
+        if (!existing) throw new Error('Capture conflict without an owner row.')
+        analysis = toAnalysis(existing)
+      } else {
+        analysis = {
+          id,
+          createdAt: now,
+          report,
+          location,
+          language,
+          messages: [],
+          saved: false,
+          imageUrl: imageUrl(id),
+          previewUrl: imageUrl(id, 'chat'),
+          provider: provider.name,
+          model: provider.model,
+        }
+        // Quota bookkeeping must never undo a capture that is already stored.
+        try {
+          await bumpUsage(c.env.nekibuki, user.id, 'analyses')
+        } catch (error) {
+          console.error(
+            JSON.stringify({
+              level: 'error',
+              message: 'Could not record usage',
+              error: error instanceof Error ? error.message : String(error),
+            }),
+          )
+        }
+      }
+    } catch (error) {
+      // Never leave half a capture behind.
+      try {
+        await c.env.CAPTURES.delete(
+          [keys.photo, keys.chat].filter((key): key is string => Boolean(key)),
+        )
+      } catch {
+        // best effort
+      }
+      console.error(
+        JSON.stringify({
+          level: 'error',
+          message: 'Could not archive the capture',
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      )
+      throw new HTTPException(502, {
+        message: 'The guide read the photo but could not save it. Try again.',
+      })
+    }
+  }
+
   return c.json(
     {
       report,
+      analysis,
       meta: {
         provider: provider.name,
         model: provider.model,
@@ -278,8 +479,14 @@ app.post('/api/analyze', async (c) => {
   )
 })
 
+// ─────────────────────────────────────────────────────────────
+// Legacy demo chat (the report travels in the body; nothing is stored)
+// ─────────────────────────────────────────────────────────────
+
+app.use('/api/chat', withSession)
+
 app.post('/api/chat', async (c) => {
-  await requireUser(c.env, c.req.header('authorization'))
+  if (c.get('authEnabled')) requireUser(c)
 
   const body = await c.req.json().catch(() => null)
   const parsed = chatRequestSchema.safeParse(body)
@@ -298,6 +505,22 @@ app.post('/api/chat', async (c) => {
 
   return c.json({ answer, provider: provider.name }, 200, { 'cache-control': 'no-store' })
 })
+
+// ─────────────────────────────────────────────────────────────
+// Stored analyses
+// ─────────────────────────────────────────────────────────────
+
+app.use('/api/analyses', withSession)
+app.use('/api/analyses/*', withSession)
+app.route('/api/analyses', analyses)
+
+// ─────────────────────────────────────────────────────────────
+// Guided walks (Pi Durable)
+// ─────────────────────────────────────────────────────────────
+
+app.use('/api/walks', withSession)
+app.use('/api/walks/*', withSession)
+app.route('/api/walks', walks)
 
 app.notFound((c) => c.json({ error: 'Not found', code: 'not_found' }, 404))
 
@@ -326,3 +549,9 @@ app.onError((error, c) => {
 })
 
 export default app
+
+/**
+ * The Pi Durable walk guide. One object per walk; the API reaches it through
+ * the `WALK_AGENT` binding.
+ */
+export { WalkAgent } from './walk/agent'

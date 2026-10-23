@@ -9,26 +9,16 @@ export function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-const MONTH_NAMES = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-]
+const MONTH_NAMES = {
+  en: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+  tr: ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'],
+} as const
 
 /**
  * One axis of distance, so a column of dates reads as one column:
  * `Today, 17:16` → `Yesterday` → `4 days ago` → `13 Oct`.
  */
-export function formatRelativeDate(timestamp: number): string {
+export function formatRelativeDate(timestamp: number, language: 'en' | 'tr' = 'en'): string {
   const date = new Date(timestamp)
   const now = new Date()
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
@@ -38,11 +28,11 @@ export function formatRelativeDate(timestamp: number): string {
   if (days <= 0) {
     const hours = String(date.getHours()).padStart(2, '0')
     const minutes = String(date.getMinutes()).padStart(2, '0')
-    return `Today, ${hours}:${minutes}`
+    return `${language === 'tr' ? 'Bugün' : 'Today'}, ${hours}:${minutes}`
   }
-  if (days === 1) return 'Yesterday'
-  if (days <= 7) return `${days} days ago`
-  return `${date.getDate()} ${MONTH_NAMES[date.getMonth()]}`
+  if (days === 1) return language === 'tr' ? 'Dün' : 'Yesterday'
+  if (days <= 7) return language === 'tr' ? `${days} gün önce` : `${days} days ago`
+  return `${date.getDate()} ${MONTH_NAMES[language][date.getMonth()]}`
 }
 
 export function groupDay(timestamp: number): 'today' | 'yesterday' | 'week' | 'earlier' {

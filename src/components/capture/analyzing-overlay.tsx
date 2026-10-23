@@ -6,13 +6,14 @@ import { Button } from '@/components/ui/button'
 import { powerTier } from '@/lib/device'
 import { usePreferences } from '@/store/preferences'
 import { spring } from '@/lib/motion'
+import { useT } from '@/lib/ui-language'
 
 /** Controls that can hold focus while the overlay owns the screen. */
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
 /** The shutter on the camera panel, used when the browser did not focus it. */
-const SHUTTER = '[aria-label="Take a photo"]'
+const SHUTTER = '[data-shutter]'
 
 /**
  * The blurred backdrop behind the analysis card.
@@ -73,6 +74,7 @@ export function AnalyzingOverlay({
   onRetry: () => void
 }) {
   const language = usePreferences((state) => state.guideLanguage)
+  const t = useT()
   const messages = ANALYZING_MESSAGES[language]
   const tier = powerTier()
   const [messageIndex, setMessageIndex] = useState(0)
@@ -179,7 +181,7 @@ export function AnalyzingOverlay({
       className="fixed inset-0 z-[100] flex flex-col items-center justify-center overflow-hidden bg-black px-6 text-white outline-none"
     >
       <h2 id={titleId} className="sr-only">
-        Analyzing photo
+        {t('Analyzing photo', 'Fotoğraf inceleniyor')}
       </h2>
       {/* The step list is written once, so the live region speaks a single
           time instead of every 1.6 seconds. The visible copy keeps rotating. */}
@@ -239,7 +241,7 @@ export function AnalyzingOverlay({
             >
               {/* The description of the dialog: it must not change while the
                   copy rotates, or the screen reader repeats it. */}
-              <span className="sr-only">{error ? 'Analysis failed.' : 'Analysing your photo.'}</span>
+              <span className="sr-only">{error ? t('Analysis failed.', 'İnceleme başarısız.') : t('Analysing your photo.', 'Fotoğrafın inceleniyor.')}</span>
               <span aria-hidden>{error ?? messages[messageIndex]}</span>
             </motion.p>
           </AnimatePresence>
@@ -249,8 +251,8 @@ export function AnalyzingOverlay({
           <>
             <div
               role="progressbar"
-              aria-label="Analysing your photo"
-              aria-valuetext="Analysing"
+              aria-label={t('Analysing your photo', 'Fotoğrafın inceleniyor')}
+              aria-valuetext={t('Analysing', 'İnceleniyor')}
               className="mt-4 h-1 w-40 overflow-hidden rounded-full bg-white/15"
             >
               {reduceMotion ? (
@@ -268,10 +270,10 @@ export function AnalyzingOverlay({
             <button
               type="button"
               onClick={onCancel}
-              aria-label="Cancel analysis"
+              aria-label={t('Cancel analysis', 'İncelemeyi iptal et')}
               className="mt-8 inline-flex min-h-11 items-center gap-1.5 rounded-full px-4 text-sm text-white/65 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
             >
-              <X className="size-3.5" /> Cancel
+              <X className="size-3.5" /> {t('Cancel', 'İptal')}
               <span aria-hidden className="tabular-nums">
                 ({elapsed}s)
               </span>
@@ -280,14 +282,14 @@ export function AnalyzingOverlay({
         ) : (
           <div className="mt-8 flex flex-col items-center gap-2.5">
             <Button size="lg" className="bg-white text-black hover:bg-white/90" onClick={onRetry}>
-              <RotateCcw className="size-4" /> Try again
+              <RotateCcw className="size-4" /> {t('Try again', 'Tekrar dene')}
             </Button>
             <button
               type="button"
               onClick={onCancel}
               className="inline-flex min-h-11 items-center rounded-full px-4 text-sm text-white/65 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
             >
-              Back to the camera
+              {t('Back to the camera', 'Kameraya dön')}
             </button>
           </div>
         )}

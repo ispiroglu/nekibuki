@@ -1,14 +1,21 @@
 import type { Analysis } from '@shared/types'
+import type { WalkPlanSummary, WalkRecord } from '@shared/walks'
 import { AnimatePresence, motion } from 'motion/react'
-import { Bookmark, Camera, MessageSquare, Search } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { Bookmark, Camera, Footprints, Loader2, MessageSquare, Search } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import { listWalkPlans, listWalks, startWalk } from '@/lib/api'
+import { haptic } from '@/lib/haptics'
 import { photoAtWidth } from '@/lib/image'
 import { staggerContainer, staggerItem } from '@/lib/motion'
 import { useHistory } from '@/hooks/use-history'
 import { useAppStore } from '@/store/app'
+import { usePreferences } from '@/store/preferences'
+import { useT, useUiLanguage } from '@/lib/ui-language'
 import { cn, formatRelativeDate, groupDay } from '@/lib/utils'
 
 const DAY_RANK: Record<ReturnType<typeof groupDay>, number> = {
@@ -37,6 +44,7 @@ export function HistoryScreen({
   active?: boolean
 }) {
   const { analyses, loading, error, refresh } = useHistory()
+  const t = useT()
   const [query, setQuery] = useState('')
   const [savedOnly, setSavedOnly] = useState(false)
   // The deck keeps every panel mounted, so the panel that owns the route must
@@ -64,7 +72,7 @@ export function HistoryScreen({
 
   return (
     <section
-      aria-label="Places"
+      aria-label={t('Places', 'Yerler')}
       className="h-full touch-pan-y overflow-y-auto overscroll-contain bg-background pb-28"
     >
       <header className="glass sticky top-0 z-10 pb-3 safe-top">
@@ -72,14 +80,14 @@ export function HistoryScreen({
           <button
             type="button"
             onClick={onOpenCamera}
-            aria-label="Open the camera"
+            aria-label={t('Open the camera', 'Kamerayı aç')}
             className="grid size-11 shrink-0 place-items-center self-end rounded-full bg-secondary text-foreground active:scale-[0.97] [@media(max-height:480px)]:self-auto"
           >
             <Camera className="size-5" />
           </button>
 
           <Heading className="display mt-4 text-4xl font-medium [@media(max-height:480px)]:mt-0 [@media(max-height:480px)]:min-w-0 [@media(max-height:480px)]:truncate [@media(max-height:480px)]:text-2xl">
-            Places
+            {t('Places', 'Yerler')}
           </Heading>
 
           <div className="mt-4 flex items-center gap-2 [@media(max-height:480px)]:mt-0 [@media(max-height:480px)]:min-w-0 [@media(max-height:480px)]:flex-1">
@@ -92,8 +100,8 @@ export function HistoryScreen({
                 id="history-search"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search your places"
-                aria-label="Search your places"
+                placeholder={t('Search your places', 'Yerlerinde ara')}
+                aria-label={t('Search your places', 'Yerlerinde ara')}
                 className="flex-1 rounded-none focus-visible:ring-0 focus-visible:ring-offset-0"
                 data-no-swipe
               />
@@ -102,7 +110,7 @@ export function HistoryScreen({
               type="button"
               onClick={() => setSavedOnly((value) => !value)}
               aria-pressed={savedOnly}
-              aria-label="Show only saved places"
+              aria-label={t('Show only saved places', 'Yalnızca kaydedilen yerleri göster')}
               className={cn(
                 'grid size-11 shrink-0 place-items-center rounded-full transition-colors active:scale-[0.97]',
                 savedOnly
@@ -117,6 +125,8 @@ export function HistoryScreen({
       </header>
 
       <div className="mx-auto w-full max-w-3xl">
+        <GuidedWalks />
+
         {loading && (
           <div className="px-3 pt-2">
             {[0, 1, 2].map((index) => (
@@ -137,14 +147,14 @@ export function HistoryScreen({
             className="mx-3 mt-2 flex flex-col items-start gap-3 rounded-2xl bg-secondary p-4"
           >
             <p className="text-sm text-muted-foreground">
-              We couldn’t load your places. Check your connection and try again.
+              {t('We couldn’t load your places. Check your connection and try again.', 'Yerlerin yüklenemedi. Bağlantını kontrol edip tekrar dene.')}
             </p>
             <button
               type="button"
               onClick={() => void refresh()}
               className="inline-flex min-h-11 items-center justify-center rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground active:scale-[0.97]"
             >
-              Try again
+              {t('Try again', 'Tekrar dene')}
             </button>
           </div>
         )}
@@ -162,17 +172,17 @@ export function HistoryScreen({
             </div>
             <h2 className="display mt-5 text-2xl font-medium">
               {analyses.length === 0
-                ? 'Nothing yet'
+                ? t('Nothing yet', 'Henüz bir şey yok')
                 : savedOnly && !query.trim()
-                  ? 'No saved places yet'
-                  : 'No matches'}
+                  ? t('No saved places yet', 'Henüz kaydedilmiş yer yok')
+                  : t('No matches', 'Eşleşme yok')}
             </h2>
             <p className="mt-2 max-w-xs text-sm leading-relaxed text-muted-foreground">
               {analyses.length === 0
-                ? 'Point your camera at a monument, a landscape or a street corner and this is where it lives.'
+                ? t('Point your camera at a monument, a landscape or a street corner and this is where it lives.', 'Kameranı bir anıta, manzaraya ya da sokak köşesine tut; burada yaşayacak.')
                 : savedOnly && !query.trim()
-                  ? 'Tap the bookmark on a guide to keep it here.'
-                  : 'Try another word, or clear the filters.'}
+                  ? t('Tap the bookmark on a guide to keep it here.', 'Burada tutmak için bir rehberdeki yer imine dokun.')
+                  : t('Try another word, or clear the filters.', 'Başka bir kelime dene ya da filtreleri temizle.')}
             </p>
             {analyses.length === 0 ? (
               <button
@@ -180,7 +190,7 @@ export function HistoryScreen({
                 onClick={onOpenCamera}
                 className="mt-6 inline-flex h-12 items-center gap-2 rounded-full bg-primary px-6 font-medium text-primary-foreground active:scale-[0.97]"
               >
-                <Camera className="size-4" /> Open the camera
+                <Camera className="size-4" /> {t('Open the camera', 'Kamerayı aç')}
               </button>
             ) : (
               <button
@@ -191,7 +201,7 @@ export function HistoryScreen({
                 }}
                 className="mt-6 inline-flex h-12 items-center justify-center rounded-full bg-secondary px-6 font-medium text-foreground active:scale-[0.97]"
               >
-                {savedOnly && !query.trim() ? 'Show all places' : 'Clear filters'}
+                {savedOnly && !query.trim() ? t('Show all places', 'Tüm yerleri göster') : t('Clear filters', 'Filtreleri temizle')}
               </button>
             )}
           </div>
@@ -220,8 +230,125 @@ export function HistoryScreen({
   )
 }
 
+/**
+ * A walk is normally entered from the place it belongs to, but the list keeps
+ * it discoverable (and testable) before the traveller has taken that photo.
+ */
+function GuidedWalks() {
+  const navigate = useNavigate()
+  const t = useT()
+  const language = useUiLanguage()
+  const hapticsEnabled = usePreferences((state) => state.haptics)
+  const [plans, setPlans] = useState<WalkPlanSummary[] | null>(null)
+  const [activeWalks, setActiveWalks] = useState<WalkRecord[] | null>(null)
+  const [starting, setStarting] = useState<string | null>(null)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    Promise.allSettled([
+      listWalkPlans(controller.signal),
+      listWalks({ signal: controller.signal }),
+    ]).then(([plansResult, walksResult]) => {
+      if (plansResult.status === 'fulfilled') setPlans(plansResult.value)
+      else setPlans([])
+      if (walksResult.status === 'fulfilled') setActiveWalks(walksResult.value)
+      else setActiveWalks([])
+    })
+    return () => controller.abort()
+  }, [])
+
+  const ready = plans !== null && activeWalks !== null
+  const hasAny = (plans?.length ?? 0) > 0 || (activeWalks?.length ?? 0) > 0
+  if (!ready || !hasAny) return null
+
+  const begin = async (plan: WalkPlanSummary) => {
+    if (starting) return
+    setStarting(plan.id)
+    try {
+      const walk = await startWalk({ planId: plan.id, language })
+      haptic('medium', hapticsEnabled)
+      navigate(`/walk/${walk.id}`)
+    } catch (cause) {
+      toast.error(
+        cause instanceof Error ? cause.message : t('Could not start the walk.', 'Yürüyüş başlatılamadı.'),
+      )
+    } finally {
+      setStarting(null)
+    }
+  }
+
+  return (
+    <section className="px-3 pt-3" aria-label={t('Guided walks', 'Adım adım geziler')}>
+      <div className="rounded-2xl bg-brand px-4 py-4 text-brand-fg">
+        <div className="flex items-center gap-2 text-label font-medium tracking-[0.08em] uppercase opacity-80">
+          <Footprints className="size-3.5" />
+          {t('Guided walks', 'Adım adım geziler')}
+        </div>
+
+        {activeWalks?.map((walk) => (
+          <div key={walk.id} className="mt-3 flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="font-serif text-[1.05rem] leading-snug">
+                {language === 'tr' ? walk.title : (walk.titleEn ?? walk.title)}
+              </p>
+              <p className="mt-0.5 truncate text-xs opacity-80">
+                {walk.visitedCount}/{walk.stopCount} {t('stops seen', 'durak görüldü')}
+                {walk.currentStop ? ` · ${walk.currentStop}` : ''}
+              </p>
+            </div>
+            <Button
+              variant="secondary"
+              size="pill"
+              onClick={() => {
+                haptic('medium', hapticsEnabled)
+                navigate(`/walk/${walk.id}`)
+              }}
+            >
+              <Footprints className="size-4" />
+              {t('Continue', 'Devam et')}
+            </Button>
+          </div>
+        ))}
+
+        {activeWalks && activeWalks.length > 0 && plans && plans.length > 0 && (
+          <div className="my-3 h-px bg-brand-fg/15" />
+        )}
+
+        {plans?.map((plan) => (
+          <div key={plan.id} className="mt-3 flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="font-serif text-[1.05rem] leading-snug">
+                {language === 'tr' ? plan.title : plan.titleEn}
+              </p>
+              <p className="mt-0.5 truncate text-xs opacity-80">
+                {plan.place} · {plan.stopCount} {t('stops', 'durak')} · ~{plan.minutes}{' '}
+                {t('min', 'dk')}
+              </p>
+            </div>
+            <Button
+              variant="secondary"
+              size="pill"
+              onClick={() => void begin(plan)}
+              disabled={starting !== null}
+            >
+              {starting === plan.id ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Footprints className="size-4" />
+              )}
+              {t('Start', 'Başla')}
+            </Button>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 function HistoryRow({ analysis, animate }: { analysis: Analysis; animate: boolean }) {
   const navigate = useNavigate()
+  const t = useT()
+  const language = useUiLanguage()
   const [thumbFailed, setThumbFailed] = useState(false)
   const questionCount = analysis.messages.filter((message) => message.role === 'user').length
   const thumb160 = photoAtWidth(analysis.previewUrl, 160)
@@ -230,10 +357,10 @@ function HistoryRow({ analysis, animate }: { analysis: Analysis; animate: boolea
   const thumbSrcSet = thumb160 && thumb240 ? `${thumb160} 160w, ${thumb240} 240w` : undefined
   const label = [
     analysis.report.title,
-    analysis.saved && 'saved',
+    analysis.saved && t('saved', 'kaydedildi'),
     analysis.report.location.name,
-    formatRelativeDate(analysis.createdAt),
-    questionCount > 0 && `${questionCount} ${questionCount === 1 ? 'question' : 'questions'}`,
+    formatRelativeDate(analysis.createdAt, language),
+    questionCount > 0 && `${questionCount} ${t('questions', 'soru')}`,
   ]
     .filter(Boolean)
     .join(', ')
@@ -279,7 +406,7 @@ function HistoryRow({ analysis, animate }: { analysis: Analysis; animate: boolea
             )}
           </p>
           <p className="mt-0.5 truncate text-sm text-muted-foreground">
-            {analysis.report.location.name} · {formatRelativeDate(analysis.createdAt)}
+            {analysis.report.location.name} · {formatRelativeDate(analysis.createdAt, language)}
           </p>
         </div>
 

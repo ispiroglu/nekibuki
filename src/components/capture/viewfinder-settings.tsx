@@ -1,5 +1,6 @@
 import { Grid3x3, Zap, ZapOff } from 'lucide-react'
 import type { RefObject } from 'react'
+import { useT } from '@/lib/ui-language'
 import { cn } from '@/lib/utils'
 
 /** Render a zoom factor the way a camera does: `1×`, `2×`, `0.5×`. */
@@ -68,6 +69,7 @@ export function ViewfinderSettings({
   zoomStep: number
   onSelectZoom: (value: number) => void
 }) {
+  const t = useT()
   const hasZoom = zoomPresets.length > 1
 
   return (
@@ -75,7 +77,7 @@ export function ViewfinderSettings({
       ref={panelRef}
       id={panelId}
       role="dialog"
-      aria-label="Viewfinder settings"
+      aria-label={t('Viewfinder settings', 'Vizör ayarları')}
       tabIndex={-1}
       className={cn(
         'glass-dark-live pointer-events-auto flex w-max max-w-[calc(100vw-16px)] flex-col rounded-2xl p-[6px] text-white',
@@ -86,13 +88,13 @@ export function ViewfinderSettings({
       <div className="flex items-center justify-center gap-1">
         {torchAvailable && (
           <Toggle
-            label="Torch"
+            label={t('Torch', 'Flaş')}
             pressed={torch}
             onToggle={onToggleTorch}
             icon={torch ? Zap : ZapOff}
           />
         )}
-        <Toggle label="Grid" pressed={grid} onToggle={onToggleGrid} icon={Grid3x3} />
+        <Toggle label={t('Grid', 'Izgara')} pressed={grid} onToggle={onToggleGrid} icon={Grid3x3} />
       </div>
 
       {hasZoom && (
@@ -102,7 +104,7 @@ export function ViewfinderSettings({
             '[@media(max-height:460px)]:mt-0 [@media(max-height:460px)]:ml-1 [@media(max-height:460px)]:border-t-0 [@media(max-height:460px)]:border-l [@media(max-height:460px)]:pl-2 [@media(max-height:460px)]:pt-0',
           )}
         >
-          <div role="group" aria-label="Zoom" className="flex items-center gap-0.5">
+          <div role="group" aria-label={t('Zoom', 'Yakınlaştırma')} className="flex items-center gap-0.5">
             {zoomPresets.map((preset) => {
               const active = Math.abs(activeZoom - preset) < Math.max(0.06, zoomStep / 2)
               return (

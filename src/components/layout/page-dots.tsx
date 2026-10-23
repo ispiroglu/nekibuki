@@ -1,11 +1,12 @@
 import { motion } from 'motion/react'
 import { Bookmark, Camera, UserRound } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useT } from '@/lib/ui-language'
 
 const SCREENS = [
-  { index: 0, label: 'You', icon: UserRound },
-  { index: 1, label: 'Camera', icon: Camera },
-  { index: 2, label: 'Places', icon: Bookmark },
+  { index: 0, label: ['You', 'Sen'] as const, icon: UserRound },
+  { index: 1, label: ['Camera', 'Kamera'] as const, icon: Camera },
+  { index: 2, label: ['Places', 'Yerler'] as const, icon: Bookmark },
 ]
 
 export function PageDots({
@@ -19,10 +20,11 @@ export function PageDots({
   tone?: 'light' | 'dark'
   className?: string
 }) {
+  const t = useT()
   return (
     <div
       role="group"
-      aria-label="Screens"
+      aria-label={t('Screens', 'Ekranlar')}
       className={cn(
         'flex items-center gap-2 rounded-full p-1',
         // The dark tone only ever sits over the live viewfinder, so it takes
@@ -38,7 +40,7 @@ export function PageDots({
           <button
             key={screen.index}
             aria-current={active ? 'page' : undefined}
-            aria-label={screen.label}
+            aria-label={t(screen.label[0], screen.label[1])}
             onClick={() => onSelect(screen.index)}
             className={cn(
               'relative flex size-11 items-center justify-center rounded-full transition-colors duration-200',
