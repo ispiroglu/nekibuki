@@ -10,6 +10,8 @@ four trivia cards, then detailed sections with the detail you are looking at cal
 It is a PWA: installable, camera-first and mobile-shaped. The demo keeps everything on the
 device; the hosted build syncs with the Worker.
 
+See [CHANGELOG.md](CHANGELOG.md) for what changed and when.
+
 ## Stack
 
 | Layer | Choice |
