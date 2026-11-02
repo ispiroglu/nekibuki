@@ -37,3 +37,4 @@ worker-configuration.d.ts
 
 # Scratch prototypes
 /prototype/
+.bmad/upstream
