@@ -5,7 +5,9 @@
 autonomy: L2
 concurrency: 2
 main_branch: main
-sandbox: no-sandbox
+# Factory stages run only inside the macOS seatbelt sandbox: the agent keeps this machine's
+# toolchain (bun, node), but cannot reach outside the stage worktree and the paths it needs.
+sandbox: seatbelt
 runtime:
   agent: pi
   model: opencode-go/deepseek-v4.1-flash:high
