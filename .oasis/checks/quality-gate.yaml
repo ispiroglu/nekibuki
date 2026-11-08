@@ -1,0 +1,12 @@
+# What oasis runs for the Quality gate, outside the agent, from the base commit.
+# Quality Assurance writes its end-to-end tests under tests/end-to-end/ (they run as `bun test`, the
+# only test runner this repository has), so this runs exactly that directory. gate-runner's
+# `quality-gate/revert-fails-tests` re-runs this same command on the main branch with the new tests
+# overlaid: a change whose tests still pass without it fails here.
+# install comes first because a gate worktree is a plain `git worktree add` under the run store and
+# has no node_modules.
+commands:
+  - name: install
+    run: bun install --frozen-lockfile
+  - name: end-to-end
+    run: bun test tests/end-to-end

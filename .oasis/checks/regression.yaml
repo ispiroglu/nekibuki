@@ -1,0 +1,8 @@
+# The full unit and integration suite against the branch head, so the Quality gate proves the new
+# end-to-end tests and the existing suite together (gate-runner's `quality-gate/regression-passes`
+# reads this file; without it that check passes with no evidence).
+commands:
+  - name: install
+    run: bun install --frozen-lockfile
+  - name: regression
+    run: bun run test

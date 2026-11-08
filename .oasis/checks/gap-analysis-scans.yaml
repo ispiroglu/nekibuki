@@ -1,0 +1,12 @@
+# Scanners oasis runs outside the agent before the Gap analysis session; a non-zero exit is a finding
+# and the Release gate refuses to merge on one. This repository has no linter, so the real static
+# analysis available is the type checker over all three tsc projects plus the production bundle
+# (which starts with the same typecheck and then makes Vite resolve every import). Both are the
+# repository's own scripts (package.json).
+commands:
+  - name: install
+    run: bun install --frozen-lockfile
+  - name: static-analysis
+    run: bun run typecheck
+  - name: bundle
+    run: bun run build

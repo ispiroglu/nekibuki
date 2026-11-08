@@ -1,0 +1,16 @@
+# What oasis runs for the Implementation gate, outside the agent, from the base commit.
+# install comes first because a gate worktree is a plain `git worktree add` under the run store
+# (cli/src/adapters/repository.ts addWorktree) and has no node_modules; the commands below are the
+# repository's own scripts (package.json, AGENTS.md), not npm defaults.
+# typecheck runs `wrangler types` first, so worker-configuration.d.ts (gitignored) is generated in
+# the worktree before the three tsc projects read it.
+# build is `bun run typecheck && vite build`, so it re-proves the types and then the bundle.
+commands:
+  - name: install
+    run: bun install --frozen-lockfile
+  - name: test
+    run: bun run test
+  - name: typecheck
+    run: bun run typecheck
+  - name: build
+    run: bun run build

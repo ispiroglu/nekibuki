@@ -1,0 +1,18 @@
+# The only source of context names, paths, and requirement prefixes.
+# A gate reads this file at the base commit, so every commit that starts a run needs it.
+# Triage names the context a bug's root cause lives in; the gate then checks that every file it
+# names sits under that context's path. A missing registry fails every context name (docs/70 11.5).
+#
+# This repository has two bounded contexts, split the same way the code is:
+# `app` is what the traveller holds (React, screens, store), `api` is what answers them (the Hono
+# Worker, its routes, services, and the walk Durable Object). shared/ is the contract between them.
+contexts:
+  app:
+    path: src/
+    req_prefix: APP
+  api:
+    path: worker/
+    req_prefix: API
+  shared:
+    path: shared/
+    req_prefix: SHR
