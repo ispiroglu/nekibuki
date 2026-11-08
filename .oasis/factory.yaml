@@ -1,0 +1,44 @@
+# The oasis factory for nekibuki: a React 19 PWA in src/ behind one Hono Cloudflare Worker in worker/.
+# Every other stage keeps the model's write paths, which already fit this repository: business and
+# design documents under docs/, end-to-end tests under tests/end-to-end/ (Quality Assurance only),
+# the gap analysis report under docs/gap-analysis/, and CHANGELOG.md at Release.
+autonomy: L2
+concurrency: 2
+main_branch: main
+sandbox: no-sandbox
+runtime:
+  agent: pi
+  model: opencode-go/deepseek-v4.1-flash:high
+adapters:
+  project_management: github
+  repository: github
+question_deadline_hours: 24
+stage_timeout_minutes: 30
+# The model's default Implement paths assume code under apps/<app>/ (docs/70 section 5.6); this
+# repository keeps the web app in src/, the Worker in worker/, and the types both share in shared/.
+# tests/end-to-end/ is deliberately absent: Quality Assurance owns it, and the Implementation gate
+# fails a diff that touches it. Unit and integration tests live beside the source or in tests/*.test.ts
+# or tests/unit/ or tests/integration/, so Implement can still write them.
+write_paths:
+  implement:
+    - "src/**"
+    - "worker/**"
+    - "shared/**"
+    - "public/**"
+    - "scripts/**"
+    - "tests/*.test.ts"
+    - "tests/unit/**"
+    - "tests/integration/**"
+    - "index.html"
+    - "vite.config.ts"
+    - "wrangler.jsonc"
+    - "package.json"
+    - "bun.lock"
+    - "tsconfig.app.json"
+    - "tsconfig.worker.json"
+    - "tsconfig.node.json"
+    - "docs/**"
+    - "README.md"
+    - "DESIGN.md"
+    - "PRODUCT.md"
+    - "CHANGELOG.md"
