@@ -62,27 +62,27 @@ assertions.
 Scan findings: none. `install`, `static-analysis` and `bundle` all exited 0, so there is no open
 critical or high scan finding.
 
-Review findings (all low; none blocks release):
+Review findings, one per row, title verbatim (all low; none blocks release):
 
-1. **F1 — AC-1.5 is met through the per-surface invocation, not the unqualified one.** At S1's
-   head, `bun run layout:check` with no argument still exits 1 on `layout/onboarding-wide-column`,
-   the introduction case owned by S2. Resolution: accepted by design — `test-plan.md` defines
+1. AC-1.5 is met through the per-surface invocation, not the unqualified one — At S1's head,
+   `bun run layout:check` with no argument still exits 1 on `layout/onboarding-wide-column`, the
+   introduction case owned by S2. Resolution: accepted by design — `test-plan.md` defines
    `bun run layout:check login` as the Story's green run and the unqualified run as the
    whole-feature gate after S2 lands.
-2. **F2 — AC-1.5's browser case is conditionally skipped without Chromium or a loopback server.**
+2. AC-1.5's browser case is conditionally skipped without Chromium or a loopback server —
    `check-fails-on-base-commit.test.ts` skips the case that starts dev servers and runs the check
    when no browser can launch; the always-on case then asserts only the unknown-surface exit code
    and the `layout:check` script wiring. Resolution: recorded limit — the Quality gate and the
    recorded implementation run execute the browser case outside the agent sandbox (branch exit 0,
    base exit 1), and the base-commit discrimination is independently re-proved here by the revert
    check that fails AC-1.1 and AC-1.2.
-3. **F3 — `data-layout-column="login"` is a test hook in shipped markup.** The wrapper added to
-   the sign-in surface carries the attribute that `scripts/layout-check.mjs` accepts as a column
-   marker, although the check already finds the wrapper through its `mx-auto` + `max-w-*` classes.
+3. data-layout-column="login" is a test hook in shipped markup — The wrapper added to the sign-in
+   surface carries the attribute that `scripts/layout-check.mjs` accepts as a column marker,
+   although the check already finds the wrapper through its `mx-auto` + `max-w-*` classes.
    Resolution: accepted — the hook is documented in the check's header, has no runtime effect and
    lets the instrument survive a future implementation that centres the column by other classes.
-4. **F4 — the layout check filters `Failed to load resource` console errors.** `gate/no-console-errors`
-   in `scripts/layout-check.mjs` ignores resource-load errors so externally hosted artwork cannot
+4. The layout check filters Failed to load resource console errors — `gate/no-console-errors` in
+   `scripts/layout-check.mjs` ignores resource-load errors so externally hosted artwork cannot
    decide a layout result; a missing app-owned asset would therefore not fail that case.
    Resolution: accepted for this instrument — the Vite build resolves every import, and the
    artwork's own availability is not the reading-measure subject; the sign-in render/console case
