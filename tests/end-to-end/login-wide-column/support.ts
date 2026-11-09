@@ -344,14 +344,120 @@ export function displayedChildren(container: El, viewport: Viewport, engine: Eng
   return children
 }
 
-/** The grid item an element is laid out as, skipping `display: contents` wrappers. */
-export function gridItem(el: El, container: El, viewport: Viewport, engine: Engine): El {
+/** The box the surface lays an element out in, skipping `display: contents` wrappers. */
+export function blockContaining(el: El, container: El, viewport: Viewport, engine: Engine): El {
   const item = displayedChildren(container, viewport, engine).find((candidate) => {
     for (let node: El | null = el; node; node = node.parent) if (node === candidate) return true
     return false
   })
-  if (!item) throw new Error('layout model: element is not a grid item of the container')
+  if (!item) throw new Error('layout model: element is not laid out inside the container')
   return item
+}
+
+/** A child's box inside its container, in the container's coordinates. */
+export interface Placement {
+  x: number
+  y: number
+  width: number
+  row: number
+}
+
+/** Split a CSS list value on spaces, keeping functions such as `minmax(0, 1fr)` whole. */
+function splitTokens(value: string): string[] {
+  const tokens: string[] = []
+  let depth = 0
+  let current = ''
+  for (const char of value.trim()) {
+    if (char === '(') depth += 1
+    if (char === ')') depth -= 1
+    if (/\s/.test(char) && depth === 0) {
+      if (current) tokens.push(current)
+      current = ''
+      continue
+    }
+    current += char
+  }
+  if (current) tokens.push(current)
+  return tokens
+}
+
+/** Expand `repeat(n, track)` into n tracks. */
+function expandTracks(template: string | undefined): string[] {
+  if (template === undefined || template === 'none') return []
+  return splitTokens(template).flatMap((token) => {
+    const repeat = token.match(/^repeat\(\s*(\d+)\s*,\s*(.+)\)$/)
+    return repeat ? Array.from({ length: Number(repeat[1]) }, () => repeat[2].trim()) : [token]
+  })
+}
+
+const trackSize = (track: string): { fixed: number | null; fraction: number } => {
+  const clean = track.replace(/^minmax\([^,]+,\s*(.+)\)$/, '$1').trim()
+  const fixed = lengthToPx(clean)
+  if (fixed !== null) return { fixed, fraction: 0 }
+  const fraction = clean.match(/^([\d.]+)fr$/)
+  return { fixed: null, fraction: fraction ? Number(fraction[1]) : 0 }
+}
+
+const gapOf = (styles: Styles): number => {
+  const gap = styles['column-gap'] ?? styles['gap']
+  return gap === undefined ? 0 : px(splitTokens(gap)[1] ?? splitTokens(gap)[0])
+}
+
+/**
+ * Lay a container's visible children out and return each child's box, from the container's own
+ * resolved display, tracks, gaps and flex factors — the geometry a browser would paint, whatever
+ * mechanism produces it (grid, flex row, or a stack).
+ */
+export function placeChildren(container: El, viewport: Viewport, engine: Engine): Map<El, Placement> {
+  const styles = stylesOf(container, viewport, engine)
+  const [padLeft, padRight] = sidePadding(styles)
+  const available = boxWidth(container, viewport, engine) - padLeft - padRight
+  const children = displayedChildren(container, viewport, engine)
+  const gap = gapOf(styles)
+  const display = styles.display ?? 'block'
+  const placements = new Map<El, Placement>()
+
+  if (display.includes('grid')) {
+    const expanded = expandTracks(styles['grid-template-columns'])
+    const free = available - gap * Math.max(0, expanded.length - 1)
+    const sizes = expanded.map((track) => trackSize(track))
+    const fractions = sizes.reduce((sum, size) => sum + size.fraction, 0)
+    const fixedTotal = sizes.reduce((sum, size) => sum + (size.fixed ?? 0), 0)
+    const leftover = Math.max(0, free - fixedTotal)
+    const widths = sizes.map((size) => size.fixed ?? (fractions ? (leftover * size.fraction) / fractions : free / Math.max(1, sizes.length)))
+    const columns = Math.max(1, widths.length)
+    children.forEach((child, index) => {
+      const column = index % columns
+      const row = Math.floor(index / columns)
+      const x = widths.slice(0, column).reduce((sum, width) => sum + width + gap, 0)
+      placements.set(child, { x, y: row, width: widths[column] ?? available, row })
+    })
+    return placements
+  }
+
+  const stack = !display.includes('flex') || (styles['flex-direction'] ?? '').includes('column')
+  if (stack) {
+    children.forEach((child, index) => placements.set(child, { x: 0, y: index, width: available, row: index }))
+    return placements
+  }
+
+  const grows = children.map((child) => {
+    const childStyles = stylesOf(child, viewport, engine)
+    const shorthand = (childStyles.flex ?? '').split(/\s+/)
+    const grow = childStyles['flex-grow'] !== undefined ? px(childStyles['flex-grow']) : Number(shorthand[0] ?? 0) || 0
+    return grow
+  })
+  const totalGrow = grows.reduce((sum, value) => sum + value, 0) || children.length
+  const free = available - gap * Math.max(0, children.length - 1)
+  const widths = children.map((child, index) =>
+    grows[index] ? (free * grows[index]) / totalGrow : Math.min(free, boxWidth(child, viewport, engine)),
+  )
+  let x = 0
+  children.forEach((child, index) => {
+    placements.set(child, { x, y: 0, width: widths[index], row: 0 })
+    x += widths[index] + gap
+  })
+  return placements
 }
 
 /** The classes every element across the given rendered trees emits. */
@@ -363,53 +469,6 @@ export const classTokens = (...trees: El[]): string[] => [
 export function contentWidth(el: El, viewport: Viewport, engine: Engine): number {
   const [left, right] = sidePadding(stylesOf(el, viewport, engine))
   return boxWidth(el, viewport, engine) - left - right
-}
-
-export const tracks = (template: string | undefined): number =>
-  template === undefined ? 0 : template.trim().split(/\s+(?![^(]*\))/).filter(Boolean).length
-
-/**
- * The element tree of a JSX source file, without rendering it: tags and literal className values.
- *
- * Used to measure a commit that is not checked out (the base commit's sign-in screen), so the
- * wide-column rule can be applied to the markup the check is said to fail on. Components are kept
- * as their own elements; only the tags and classes that decide a box are read.
- */
-export function parseJsx(source: string): El {
-  const root: El = { tag: '#root', attrs: {}, classes: [], children: [], parent: null }
-  let current = root
-  const tags = /<\/?[A-Za-z][\w.:-]*((?:[^>"']|"[^"]*"|'[^']*')*?)(\/?)>|<>|<\/>/g
-  for (const match of source.matchAll(tags)) {
-    const token = match[0]
-    if (token === '<>') {
-      const fragment: El = { tag: '#fragment', attrs: {}, classes: [], children: [], parent: current }
-      current.children.push(fragment)
-      current = fragment
-      continue
-    }
-    if (token === '</>') {
-      if (current.parent) current = current.parent
-      continue
-    }
-    const name = token.match(/^<\/?([A-Za-z][\w.:-]*)/)?.[1] ?? ''
-    if (token.startsWith('</')) {
-      let node: El | null = current
-      while (node && node.tag !== name.toLowerCase()) node = node.parent
-      if (node?.parent) current = node.parent
-      continue
-    }
-    const className = token.match(/className="([^"]*)"/)?.[1] ?? ''
-    const el: El = {
-      tag: name.toLowerCase(),
-      attrs: {},
-      classes: className.split(/\s+/).filter(Boolean),
-      children: [],
-      parent: current,
-    }
-    current.children.push(el)
-    if (!match[2]) current = el
-  }
-  return root
 }
 
 /** The three wide viewports and three phone viewports the Story names, plus the short landscape. */
