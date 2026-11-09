@@ -17,12 +17,32 @@ app behaviour doc, the app domain model, the app glossary, and the archived chan
 
 ## Result
 
-The fold criterion is met. All six change-spec requirements are in the living behaviour doc under
-real ids with their source and the test that checks each one, the domain model and glossary carry
-the change, and the change spec is archived with its verified commit stamped and all three tasks
-ticked. The regression suite passes everywhere this sandbox can run it; the four Chromium-dependent
-cases fail only at browser launch, which is a sandbox limit and not a regression, and the gate
-re-runs them outside the sandbox.
+The fold criterion is met and now has its own executable regression test. All six change-spec
+requirements are in the living behaviour doc under real ids with their source and the test that
+checks each one, the domain model and glossary carry the change, and the change spec is archived
+with its verified commit stamped and all three tasks ticked. The regression suite passes everywhere
+this sandbox can run it; the four Chromium-dependent cases fail only at browser launch, which is a
+sandbox limit and not a regression, and the gate re-runs them outside the sandbox.
+
+## Redirect — the fold criterion gets a test
+
+The gate sent this stage back because reverting the change made no new end-to-end test fail: a
+docs-only fold had been recorded as prose only. `tests/end-to-end/fold-archive.test.ts` now pins the
+criterion itself, in four cases:
+
+1. every change-spec file exists under `docs/changes/archive/FEAT-0001-…/` and no copy remains at
+   the unarchived `docs/changes/FEAT-0001-…/` path;
+2. the living behaviour doc carries all six requirements with a matching provenance row
+   (`APP-REQ-NEW-n` → `APP-REQ-00n`);
+3. the domain model records the effect of the reading-measure change and the glossary defines the
+   layout terms;
+4. the archived `spec.md` stamps `verified_commit: e844f79…` and `tasks.md` ticks S1, S2 and
+   Fold & archive with no unticked task.
+
+The test reads the repository, so it fails on the released `main` commit `e844f79`, where the
+archive and the living behaviour doc do not exist. Measured both ways: on the fold branch it is
+4 pass / 0 fail, and on a `git archive` checkout of `e844f79` with the file copied in it is
+0 pass / 4 fail (exit 1). No browser or server is involved.
 
 ## Fold verification
 
@@ -56,8 +76,9 @@ prove nothing else moved.
 | `tsc --noEmit -p tsconfig.app.json` | exit 0 |
 | `tsc --noEmit -p tsconfig.worker.json` | exit 0 |
 | `tsc --noEmit -p tsconfig.node.json` | exit 0 |
-| `bun test` | 18 pass / 0 skip / 4 fail (22 tests, 12 files) |
-| `bun test tests/end-to-end` | 12 pass / 0 skip / 4 fail (16 tests, 11 files) |
+| `bun test` | 22 pass / 0 skip / 4 fail (26 tests, 13 files) |
+| `bun test tests/end-to-end` | 16 pass / 0 skip / 4 fail (20 tests, 12 files) |
+| `bun test tests/end-to-end/fold-archive.test.ts` | 4 pass / 0 fail on the branch; 0 pass / 4 fail on `e844f79` |
 | `vite build` (via `node node_modules/vite/bin/vite.js build`) | exit 0 — 34 precache entries, PWA generated |
 
 On the first install pass the `workerd` lifecycle script fails to spawn with
@@ -84,8 +105,9 @@ sandbox; this run does not repeat it and does not claim it.
 
 ## Test-plan review
 
-The fold Story adds no behaviour, so its `regression` criterion needs no new test. The six folded
-requirements each already name their checking test in the living doc
+The fold Story adds no behaviour, so its `regression` criterion is covered by the repository-shape
+test added in this round, `tests/end-to-end/fold-archive.test.ts`, which fails on the reverted
+commit. The six folded requirements each already name their checking test in the living doc
 (`layout/login-wide-column`, `layout/onboarding-wide-column`, `layout/profile-wide-column`,
 `onboarding/three-slides-preserved`, `layout/phone-gutters-no-overflow`, `layout/landscape-split`,
 `layout/check-fails-on-base-commit`, `gate/typecheck-and-tests`), and those tests exist under
@@ -107,5 +129,7 @@ untouched released code and cannot be caused by a docs-only diff.
   because the spawned `wrangler`/`vite` process cannot read the worktree; their constituent steps
   (`wrangler types`, `tsc` over all three projects, and the Vite bundle) all exit 0 when invoked
   directly.
-- The fold is a documentation change; its correctness was checked by reading the living documents
-  against the change spec requirement by requirement, not by execution.
+- The fold is a documentation change; its content was checked by reading the living documents
+  against the change spec requirement by requirement, and the structural half (archive present,
+  no unarchived copy, living ids and provenance, stamped commit, ticked tasks) is executed by
+  `tests/end-to-end/fold-archive.test.ts`.
