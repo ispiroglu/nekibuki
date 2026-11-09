@@ -353,13 +353,47 @@ export function measureColumn(el: El, viewport: Viewport, engine: Engine): Colum
     left = px(leftDecl)
     right = remaining - left
   } else {
+    // No auto margin: the containing block's own alignment places the item. A plain block parent
+    // leaves a non-auto margin where it is, so the leftover space falls to the right.
+    const alignment = horizontalAlignment(parentStyles, styles)
     left = px(leftDecl)
     right = remaining - left
+    if (alignment === 'center') {
+      left = remaining / 2
+      right = remaining / 2
+    } else if (alignment === 'end') {
+      left = remaining
+      right = 0
+    }
   }
   let surface = el
   while (surface.parent && surface.parent.tag !== '#root') surface = surface.parent
   const [gutter, gutterRight] = sidePadding(stylesOf(surface, viewport, engine))
   return { width, parentWidth, leftMargin: left, rightMargin: right, gutter, gutterRight }
+}
+
+/**
+ * Which way the containing block aligns this item horizontally when no auto margin does.
+ * A flex row places it with `justify-content`, a flex column with `align-items` (`align-self`) on
+ * the horizontal cross axis, and a grid with `justify-items` (`justify-self`). `stretch`, `normal`
+ * and an unknown value all leave the box at the start, which is also what a block parent does.
+ * Auto margins win over alignment, so the caller only asks this in the no-auto case.
+ */
+function horizontalAlignment(parentStyles: Styles, itemStyles: Styles): 'start' | 'center' | 'end' {
+  const display = parentStyles.display ?? 'block'
+  if (display.includes('grid')) {
+    const align = (itemStyles['justify-self'] ?? parentStyles['justify-items'] ?? 'stretch').trim()
+    return align === 'center' ? 'center' : align === 'end' || align === 'flex-end' || align === 'right' ? 'end' : 'start'
+  }
+  if (!display.includes('flex')) return 'start'
+  if ((parentStyles['flex-direction'] ?? 'row').trim().startsWith('column')) {
+    const align = (itemStyles['align-self'] ?? parentStyles['align-items'] ?? 'stretch').trim()
+    return align === 'center' ? 'center' : align === 'end' || align === 'flex-end' ? 'end' : 'start'
+  }
+  const justify = (parentStyles['justify-content'] ?? 'normal').trim()
+  if (justify === 'center' || justify === 'space-around' || justify === 'space-evenly') return 'center'
+  if (justify === 'flex-end' || justify === 'end' || justify === 'right') return 'end'
+  return 'start'
 }
 
 /** Whether an element paints a box; `display: contents` elements hand their children to the parent. */
@@ -488,7 +522,16 @@ export function placeChildren(container: El, viewport: Viewport, engine: Engine)
   const widths = children.map((child, index) =>
     grows[index] ? (free * grows[index]) / totalGrow : Math.min(free, boxWidth(child, viewport, engine)),
   )
-  let x = 0
+  // A row that does not fill its container places its items by justify-content; space-between is
+  // the browser's own distribution and is not modelled, so its items stay at the start.
+  const leftover = free - widths.reduce((sum, width) => sum + width, 0)
+  const justify = (styles['justify-content'] ?? 'normal').trim()
+  let x =
+    justify === 'center' || justify === 'space-around' || justify === 'space-evenly'
+      ? leftover / 2
+      : justify === 'flex-end' || justify === 'end' || justify === 'right'
+        ? leftover
+        : 0
   children.forEach((child, index) => {
     placements.set(child, { x, y: 0, width: widths[index], row: 0 })
     x += widths[index] + gap

@@ -9,9 +9,9 @@ import { documentScrollWidth, measureColumn, styleEngine, type Engine } from './
  * viewport. Each case is a one-child surface with the classes named, measured at 1280×800 or
  * 320×568.
  */
-const surfaceWith = (classes: string[]): El => {
+const surfaceWith = (classes: string[], surfaceClasses: string[] = []): El => {
   const root: El = { tag: '#root', attrs: {}, classes: [], children: [], parent: null }
-  const surface: El = { tag: 'main', attrs: {}, classes: ['px-5', 'sm:px-6'], children: [], parent: root }
+  const surface: El = { tag: 'main', attrs: {}, classes: ['px-5', 'sm:px-6', ...surfaceClasses], children: [], parent: root }
   const column: El = { tag: 'div', attrs: {}, classes, children: [], parent: surface }
   surface.children.push(column)
   root.children.push(surface)
@@ -49,6 +49,31 @@ describe('layout model contract', () => {
 
     for (const [name, expected] of Object.entries(cases)) {
       const column = surfaceWith(expected.classes).children[0].children[0]
+      const { width, leftMargin, rightMargin } = measureColumn(column, WIDE, engine)
+      expect({
+        name,
+        width: Math.round(width),
+        centred: Math.abs(leftMargin - rightMargin) <= 2,
+      }).toEqual({ name, width: 672, centred: expected.centred })
+    }
+  })
+
+  test('reads a flex or grid parent’s own alignment, not just auto margins', async () => {
+    const cases = {
+      'flex row justify-center': { surface: ['flex', 'justify-center'], centred: true },
+      'flex column items-center': { surface: ['flex', 'flex-col', 'items-center'], centred: true },
+      'flex row justify-end': { surface: ['flex', 'justify-end'], centred: false },
+      'flex column items-end': { surface: ['flex', 'flex-col', 'items-end'], centred: false },
+      'flex row default start': { surface: ['flex'], centred: false },
+      'flex column default stretch': { surface: ['flex', 'flex-col'], centred: false },
+      'grid justify-items-center': { surface: ['grid', 'justify-items-center'], centred: true },
+      'grid justify-items-start': { surface: ['grid', 'justify-items-start'], centred: false },
+    }
+    const trees = Object.values(cases).map((entry) => surfaceWith(['w-full', 'max-w-2xl'], entry.surface))
+    const engine = await engineFor(trees)
+
+    for (const [name, expected] of Object.entries(cases)) {
+      const column = surfaceWith(['w-full', 'max-w-2xl'], expected.surface).children[0].children[0]
       const { width, leftMargin, rightMargin } = measureColumn(column, WIDE, engine)
       expect({
         name,
