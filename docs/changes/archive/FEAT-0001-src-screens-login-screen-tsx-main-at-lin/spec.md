@@ -6,6 +6,7 @@ context: app
 issue: 7
 related: [FEAT-0001, TWI-0001, ADR-0001, NFR-UX-001, NFR-UX-002, NFR-COMP-001, NFR-COMP-002]
 supersedes: null
+verified_commit: e844f7998f01ae9509d9d6d1d0136e9ce7682363
 ---
 
 # Change spec — center the login and onboarding screens at wide widths

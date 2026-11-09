@@ -14,4 +14,4 @@ supersedes: null
 
 - [x] S2 — Introduction content sits in the wide-viewport column
 
-- [ ] Fold & archive
+- [x] Fold & archive
