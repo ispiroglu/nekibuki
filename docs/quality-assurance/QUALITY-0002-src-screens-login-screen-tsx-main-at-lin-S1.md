@@ -24,6 +24,12 @@ All six acceptance criteria of S1 still pass on the current head `6b945b2`, the 
 still pass, and reverting the sign-in screen to the base commit `ae51078` still fails the three
 tests that describe the defect. No defect was found.
 
+Re-confirmed at worktree HEAD `473a6b3` (which adds only this report on top of `6b945b2`) from a
+fresh `bun install --frozen-lockfile`: identical results — 11 pass / 1 skip / 0 fail on
+`bun test tests/end-to-end`, 17 pass / 1 skip / 0 fail on the whole suite, clean `tsc` for the app,
+worker and node projects, the Vite build exit 0, and the same three failures (AC-1.1, AC-1.2,
+AC-1.6) with the sign-in screen restored to the base commit.
+
 The method and the test files are those recorded in QUALITY-0001 and are not repeated here: the
 layout cases render the real screen components with `react-dom/server`, resolve the real Tailwind
 CSS with Tailwind's own compiler, and measure the boxes a browser would lay out — including
