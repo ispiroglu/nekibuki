@@ -8,7 +8,7 @@
     "dev": "concurrently -k -n web,api -c cyan,magenta \"bun --bun vite\" \"wrangler dev --port 8787\"",
     "dev:web": "bun --bun vite",
     "dev:api": "wrangler dev --port 8787",
-    "build": "bun run typecheck && bun --bun vite build",
+    "build": "bun run typecheck && vite build",
     "build:only": "bun --bun vite build",
     "preview": "bun run build && wrangler dev",
     "deploy": "bun run build && wrangler deploy",
@@ -64,5 +64,8 @@
     "vite": "^8.3.4",
     "vite-plugin-pwa": "^2.0.0",
     "wrangler": "^4.42.0"
+  },
+  "postcss": {
+    "plugins": {}
   }
 }
