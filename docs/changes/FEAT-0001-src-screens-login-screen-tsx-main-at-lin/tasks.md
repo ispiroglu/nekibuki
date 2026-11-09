@@ -12,6 +12,6 @@ supersedes: null
 
 - [ ] S1 — Sign-in content sits in the wide-viewport column
 
-- [ ] S2 — Introduction content sits in the wide-viewport column
+- [x] S2 — Introduction content sits in the wide-viewport column
 
 - [ ] Fold & archive
