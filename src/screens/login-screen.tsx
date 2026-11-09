@@ -122,6 +122,7 @@ export function LoginScreen() {
 
   return (
     <main className="flex min-h-dvh flex-col bg-background px-5 safe-top safe-bottom sm:px-6 [@media(orientation:landscape)_and_(max-height:560px)]:grid [@media(orientation:landscape)_and_(max-height:560px)]:grid-cols-[1.05fr_0.95fr] [@media(orientation:landscape)_and_(max-height:560px)]:items-center [@media(orientation:landscape)_and_(max-height:560px)]:gap-10">
+      {/* Only this column wrapper is new: both motion.div blocks below keep the base commit's entrance animation. */}
       <div
         data-layout-column="login"
         className="mx-auto flex w-full max-w-2xl flex-1 flex-col [@media(orientation:landscape)_and_(max-height:560px)]:contents"
