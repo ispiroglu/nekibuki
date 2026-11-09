@@ -3,6 +3,10 @@
 Notable changes to Nekibuki, newest first. This is a product changelog, not a
 commit log; the git history has the details.
 
+## 2026-11-09 — Centred sign-in at wide widths
+
+- The sign-in surface now centres its copy and action blocks in the same 42rem column as the profile screen at 1024px and wider, with its fade-and-slide entrance animation, the 20px phone gutters and the short-landscape split layout unchanged.
+
 ## 2026-11-09 — Centred introduction at wide widths
 
 - The introduction now centres its welcome header, slide area and footer in the same 42rem column as the profile screen at 1024px and wider; phone gutters and the short-landscape split layout are unchanged, and all three slides and their copy are preserved.
