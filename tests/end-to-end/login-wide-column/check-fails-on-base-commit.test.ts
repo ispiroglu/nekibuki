@@ -8,12 +8,11 @@ import { fileURLToPath } from 'node:url'
  * printing a misleading pass.
  *
  * The measurement half of AC-1.5 — exit 0 on this branch and exit 1 on the base commit for the
- * wide sign-in column, in a real browser — is `browser-check.ts` next to this file. It is not a
- * `bun test` case on purpose: a case that cannot run here would have to skip, and a skip reads as
- * a pass. This agent sandbox can launch no Chromium and reach no dev server, so the quality report
- * records that half as `blocked`, and `browser-check.ts` says so itself (exit 3) instead of
- * skipping. Where a browser exists it runs the same base-versus-branch comparison and exits 1 on a
- * disagreement.
+ * wide sign-in column, in a real browser — is `layout-check-browser.test.ts` next to this file. It
+ * is a Playwright spec in the pinned suite, unskipped: this agent sandbox cannot launch Chromium
+ * and has no reachable dev server, so a run here fails those two cases and the quality report
+ * records the limitation in prose; the quality gate runs the suite outside the sandbox, where
+ * Playwright can launch a browser, and that run is the evidence.
  */
 const REPO = fileURLToPath(new URL('../../../', import.meta.url)).replace(/\/$/, '')
 
