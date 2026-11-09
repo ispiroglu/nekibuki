@@ -19,10 +19,11 @@ camera and report surfaces, and every viewport not listed here.
 
 ## Environments
 
-- **Browser layout check** — `scripts/layout-check.mjs`, Playwright (Chromium) against the Vite
-  dev server of this worktree (`bun run dev:web`, `BASE_URL` default `http://localhost:5173`).
-  One case per viewport, each case emitting a pass/fail line. This is the only check that can
-  fail on the base commit for the wide-width defects.
+- **Browser layout check** — `scripts/layout-check.mjs`, written as part of S1 and run with
+  `bun run layout:check`: Playwright (Chromium) against the Vite dev server of this worktree
+  (`bun run dev:web`, `BASE_URL` default `http://localhost:5173`). One case per viewport, each
+  case emitting a pass/fail line. This is S1's test for a behaviour change (AGENTS.md) and the
+  only check that can fail on the base commit for the wide-width defects.
 - **Build gates** — `bun test` and `bun run typecheck` in the worktree. No browser needed.
 - The sign-in and introduction surfaces need no credentials: the login surface is public, and
   the introduction is reached by the check's seeded local session (`localStorage` seed written by
@@ -38,17 +39,19 @@ the camera.
 
 ## Acceptance criteria → test cases
 
-| Criterion | Requirement | Test ids |
-| --- | --- | --- |
-| AC-1 Login column centred at 1024/1280/1440 | APP-REQ-NEW-1 | `layout/login-wide-column` |
-| AC-2 Login phone widths unchanged | APP-REQ-NEW-5 | `layout/phone-gutters-no-overflow` |
-| AC-3 Login short-landscape split kept | APP-REQ-NEW-5 | `layout/landscape-split` |
-| AC-4 Introduction column centred at 1024/1280/1440 | APP-REQ-NEW-2 | `layout/onboarding-wide-column` |
-| AC-5 Three slides and copy preserved | APP-REQ-NEW-4 | `onboarding/three-slides-preserved` |
-| AC-6 Introduction phone-width and landscape unchanged | APP-REQ-NEW-5 | `layout/phone-gutters-no-overflow`, `layout/landscape-split` |
-| AC-7 Profile column still centred and unchanged | APP-REQ-NEW-3 | `layout/profile-wide-column` |
-| AC-8 Browser check fails on base commit, passes after | APP-REQ-NEW-6 | `layout/check-fails-on-base-commit` |
-| AC-9 Build gates and console clean | APP-REQ-NEW-1, APP-REQ-NEW-2, APP-REQ-NEW-3 | `gate/typecheck-and-tests` |
+| Criterion | Story | Requirement | Test ids |
+| --- | --- | --- | --- |
+| AC-1.1 Login column centred at 1024/1280/1440 | S1 | APP-REQ-NEW-1 | `layout/login-wide-column` |
+| AC-1.2 Login width matches the profile column | S1 | APP-REQ-NEW-1, APP-REQ-NEW-3 | `layout/login-wide-column`, `layout/profile-wide-column` |
+| AC-1.3 Login phone widths unchanged | S1 | APP-REQ-NEW-5 | `layout/phone-gutters-no-overflow` |
+| AC-1.4 Login short-landscape split kept | S1 | APP-REQ-NEW-5 | `layout/landscape-split` |
+| AC-1.5 Check fails on base commit, passes after | S1 | APP-REQ-NEW-6 | `layout/check-fails-on-base-commit` |
+| AC-1.6 Build gates and console clean | S1 | APP-REQ-NEW-6 | `gate/typecheck-and-tests` |
+| AC-2.1 Introduction column centred at 1024/1280/1440 | S2 | APP-REQ-NEW-2 | `layout/onboarding-wide-column` |
+| AC-2.2 Introduction width matches the profile column | S2 | APP-REQ-NEW-2, APP-REQ-NEW-3 | `layout/onboarding-wide-column`, `layout/profile-wide-column` |
+| AC-2.3 Three slides and copy preserved | S2 | APP-REQ-NEW-4 | `onboarding/three-slides-preserved` |
+| AC-2.4 Introduction phone-width and landscape unchanged | S2 | APP-REQ-NEW-5 | `layout/phone-gutters-no-overflow`, `layout/landscape-split` |
+| AC-2.5 Build gates and console clean | S2 | APP-REQ-NEW-6 | `gate/typecheck-and-tests` |
 
 ## Test cases
 

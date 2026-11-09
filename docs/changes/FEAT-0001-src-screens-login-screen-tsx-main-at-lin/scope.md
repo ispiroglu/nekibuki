@@ -19,25 +19,27 @@ Single context (`app`), presentation only. No `api` or `shared` file is touched.
 - `src/screens/login-screen.tsx` — add the centred cap to the content wrapper inside `<main>`;
   keep `<main>`'s full-bleed background, safe-area classes and the
   `orientation:landscape`/`max-height:560px` grid classes on the element that carries them today.
+- `scripts/layout-check.mjs` — new Playwright check that measures the login, introduction and
+  profile columns; it is S1's test for this behaviour change (AGENTS.md: every behaviour change
+  has a test). One case per `test-plan.md` test id.
+- `package.json` — one script entry (`layout:check`) for the check, so it runs as
+  `bun run layout:check`. No dependency is added: `playwright-core` is already a dev dependency.
 
 ### S2 — Introduction content sits in the wide-viewport column
 
 - `src/screens/onboarding-screen.tsx` — add the same centred cap to the header, the slide area and
   the footer content; keep the root, the drag handling and all three slides and their copy.
 
-### S3 — Profile measure confirmed, wide-viewport measure checked
-
-- `src/screens/profile-screen.tsx` — confirm the existing `mx-auto w-full max-w-2xl` column; a
-  change here is allowed only to align the measure, never to move it inside the panel deck
-  wrapper.
-- `scripts/layout-check.mjs` — new Playwright check, one case per `test-plan.md` test id.
-- `package.json` — one script entry (`layout:check`) for the new check. No dependency is added:
-  `playwright-core` is already a dev dependency.
+The profile surface is the reference, not a change: `src/screens/profile-screen.tsx:66` already
+carries `mx-auto w-full max-w-2xl`. It is measured by the check and expected untouched; a change
+is allowed only to align the measure within the 1px tolerance, never to move it inside the panel
+deck wrapper.
 
 ## Interfaces
 
 None. No function signature, module export, prop, wire contract, OpenAPI/AsyncAPI document or
-Worker route changes. The three screens keep their existing props and imports.
+Worker route changes. The three screens keep their existing props and imports. The only new
+entry point is the `layout:check` package script.
 
 ## Migrations
 
@@ -50,12 +52,11 @@ None. The change is unconditional; rollback is a revert (ADR-0001).
 
 ## Rollback points
 
-- Per Story: revert that Story's commit; each of S1 and S2 is an independent revert because they
-  share no file.
+- Per Story: S1 and S2 share no file, so either can be reverted alone.
 - Whole change: revert the merge. No data, cache or contract to unwind, so a revert restores the
   base-commit layout exactly.
-- `scripts/layout-check.mjs` may stay in place across a revert; it fails on the base layout, which
-  is the signal it exists to give.
+- `scripts/layout-check.mjs` and the `layout:check` script may stay in place across a revert; the
+  check then fails on the old layout, which is the signal it exists to give.
 
 ## Blast radius
 

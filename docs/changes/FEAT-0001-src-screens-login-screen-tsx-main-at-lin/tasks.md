@@ -14,6 +14,4 @@ supersedes: null
 
 - [ ] S2 — Introduction content sits in the wide-viewport column
 
-- [ ] S3 — Profile measure confirmed, wide-viewport measure checked
-
 - [ ] Fold & archive
