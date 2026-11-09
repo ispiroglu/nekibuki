@@ -10,7 +10,7 @@ supersedes: null
 
 # Tasks
 
-- [ ] S1 — Sign-in content sits in the wide-viewport column
+- [x] S1 — Sign-in content sits in the wide-viewport column
 
 - [ ] S2 — Introduction content sits in the wide-viewport column
 
