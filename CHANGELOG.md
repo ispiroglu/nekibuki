@@ -3,23 +3,6 @@
 Notable changes to Nekibuki, newest first. This is a product changelog, not a
 commit log; the git history has the details.
 
-## 2026-11-09 — Centred introduction on wide viewports
-
-### From edge to edge to one reading measure
-
-On a tablet or a desktop browser the introduction used to spread its copy across
-the whole viewport, so the text column sat against the left edge. Its welcome
-header, slide area and footer now share one 42rem centred column — the same
-measure the profile surface uses and the design system's 42–48rem band.
-
-### Changed
-
-- `src/screens/onboarding-screen.tsx`: the header, the slide area and the footer
-  are capped at 42rem and centred. The three slides, their copy and the dots,
-  drag and button navigation are unchanged.
-- `DESIGN.md`: the Layout section names the sign-in and introduction surfaces in
-  the wide-screen measure.
-
 ## 2026-10-24 — On-the-fly guided walks
 
 ### From one fixed route to a tour of where you are

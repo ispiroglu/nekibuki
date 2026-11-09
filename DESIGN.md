@@ -234,9 +234,8 @@ a surface: a value sits in a stat grid, reading sits in a paragraph.
 
 The app is a three-panel horizontal deck — You, Camera, Places — with the camera in the middle.
 Each panel fills the viewport height (`100dvh`) and respects safe areas. The camera is full-bleed;
-the report is a single reading column capped at 42rem with 24px gutters; login, introduction,
-history and profile content cap at 42–48rem on wide screens instead of stretching edge to edge.
-The full-bleed background stays full-bleed; only the content is capped.
+the report is a single reading column capped at 42rem with 24px gutters; history and profile
+content should cap at 42–48rem on wide screens instead of stretching edge to edge.
 
 Spacing follows a 4px base scale. Screen gutters are 20px, card padding 16–20px, and vertical
 rhythm comes in 8/12/16/24/32 steps. Report sections breathe at 32–40px; list rows stay at 48px

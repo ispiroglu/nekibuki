@@ -91,6 +91,12 @@ export default defineConfig({
       '@shared': shared,
     },
   },
+  css: {
+    // Tailwind v4 compiles through its own Vite plugin, so this project has no PostCSS config file.
+    // The inline empty config says so: without it Vite searches upward from the worktree root and
+    // fails on the first unreadable parent, which a gate worktree inside the run store has.
+    postcss: { plugins: [] },
+  },
   server: {
     port: 5173,
     proxy: {
