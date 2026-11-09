@@ -242,7 +242,7 @@ worker/           Hono app, Better Auth, routes, vision providers, prompts, near
 worker/walk/      Pi Durable walk agent, route/progress store
 worker/db/        D1 domain schema
 shared/           domain types, zod schemas, walk plans, mock reports (used by app and worker)
-scripts/          icon generation, screenshot tour, wide-viewport layout guard
+scripts/          icon generation, screenshot tour
 ```
 
 Navigation is a three-page swipe deck — **you**, **camera**, **your places** — built on a custom
@@ -257,10 +257,6 @@ a carousel library, so the animation stays interruptible mid-swipe.
   (needs a dev server on :5173).
 - `bun run brand:shots` — captures the same screens under every brand preset and writes a
   contact sheet to `SHOT_DIR/index.html` (default `shots/brand`).
-- `bun run layout:check` — the wide-viewport guard: measures the sign-in, introduction and
-  profile columns at 1280×800, 1024×768, 1440×900, phone widths and short landscape, and fails
-  when a reading surface stretches past its 42rem measure (needs a dev server on :5173, or point
-  it with `BASE_URL=`).
 - `bun run smoke` — end-to-end check: sign in, capture, read the report, ask a question, confirm
   it reached history. Point it anywhere with `BASE_URL=https://nekibuki.thecrafter.io`.
 - `bun run perf` — the performance guard: the photo pipeline runs in the worker, the camera

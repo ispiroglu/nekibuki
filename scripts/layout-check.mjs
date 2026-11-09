@@ -9,8 +9,13 @@
  * stretch the column again.
  *
  *   bun run dev:web                          # dev server on :5173 first
- *   bun run layout:check
+ *   bun run layout:check                     # every surface
+ *   bun run layout:check login               # one surface: login, introduction or profile
  *   BASE_URL=https://nekibuki.thecrafter.io bun run layout:check
+ *
+ * Naming a surface narrows the assertions to it, so a Story can run the check
+ * while its sibling Story has not landed yet and still exit zero on its own
+ * cases. With no argument every case runs, which is the whole-feature gate.
  *
  * A "column" is the element a surface centres its content in: the one carrying
  * `mx-auto` plus a `max-w-*` cap, or an explicit `data-layout-column` hook.
@@ -51,6 +56,16 @@ const GUTTER = 20
 const GUTTER_TOLERANCE = 1
 /** Measured on the base commit ae51078: the profile surface caps at max-w-2xl, 42rem. */
 const PROFILE_BASE_WIDTH = 672
+
+/** Surfaces named on the command line; none means every surface. */
+const SURFACES = ['login', 'introduction', 'profile']
+const named = process.argv.slice(2)
+const unknown = named.filter((name) => !SURFACES.includes(name))
+if (unknown.length) {
+  console.error(`Unknown surface: ${unknown.join(', ')}. Use ${SURFACES.join(', ')}.`)
+  process.exit(2)
+}
+const wanted = (surface) => named.length === 0 || named.includes(surface)
 
 const checks = []
 const check = (id, ok, detail = '') => {
@@ -290,30 +305,36 @@ for (const viewport of WIDE) {
   const profileColumn = widest(profile.columns)
   const introductionColumn = widest(introduction.columns)
 
-  check(
-    'layout/login-wide-column',
-    centredWithin(login.columns) &&
-      Boolean(loginColumn && profileColumn) &&
-      Math.abs(loginColumn.width - profileColumn.width) <= WIDTH_TOLERANCE,
-    `@ ${at(viewport)} login ${columnLabel(loginColumn)} vs profile ${columnLabel(profileColumn)}`,
-  )
+  if (wanted('login')) {
+    check(
+      'layout/login-wide-column',
+      centredWithin(login.columns) &&
+        Boolean(loginColumn && profileColumn) &&
+        Math.abs(loginColumn.width - profileColumn.width) <= WIDTH_TOLERANCE,
+      `@ ${at(viewport)} login ${columnLabel(loginColumn)} vs profile ${columnLabel(profileColumn)}`,
+    )
+  }
 
-  check(
-    'layout/onboarding-wide-column',
-    centredWithin(introduction.columns) &&
-      Boolean(introductionColumn && profileColumn) &&
-      Math.abs(introductionColumn.width - profileColumn.width) <= WIDTH_TOLERANCE,
-    `@ ${at(viewport)} introduction ${columnLabel(introductionColumn)}`,
-  )
+  if (wanted('introduction')) {
+    check(
+      'layout/onboarding-wide-column',
+      centredWithin(introduction.columns) &&
+        Boolean(introductionColumn && profileColumn) &&
+        Math.abs(introductionColumn.width - profileColumn.width) <= WIDTH_TOLERANCE,
+      `@ ${at(viewport)} introduction ${columnLabel(introductionColumn)}`,
+    )
+  }
 
-  check(
-    'layout/profile-wide-column',
-    centredWithin(profile.columns) &&
-      profile.columns.every(
-        (column) => Math.abs(column.width - PROFILE_BASE_WIDTH) <= WIDTH_TOLERANCE,
-      ),
-    `@ ${at(viewport)} profile ${columnLabel(profileColumn)} (base ${PROFILE_BASE_WIDTH}px)`,
-  )
+  if (wanted('profile')) {
+    check(
+      'layout/profile-wide-column',
+      centredWithin(profile.columns) &&
+        profile.columns.every(
+          (column) => Math.abs(column.width - PROFILE_BASE_WIDTH) <= WIDTH_TOLERANCE,
+        ),
+      `@ ${at(viewport)} profile ${columnLabel(profileColumn)} (base ${PROFILE_BASE_WIDTH}px)`,
+    )
+  }
 }
 
 for (const viewport of PHONE) {
@@ -324,7 +345,7 @@ for (const viewport of PHONE) {
     ['login', login],
     ['introduction', introduction],
     ['profile', profile],
-  ]) {
+  ].filter(([name]) => wanted(name))) {
     if (!surface.found) {
       problems.push(`${name}: not found`)
       continue
@@ -350,16 +371,20 @@ for (const viewport of PHONE) {
 {
   const { login, introduction } = await visit(page, LANDSCAPE)
 
-  check(
-    'layout/landscape-split',
-    login.found && login.split,
-    `@ ${at(LANDSCAPE)} login two blocks on one row`,
-  )
-  check(
-    'layout/landscape-split',
-    introduction.found && introduction.split,
-    `@ ${at(LANDSCAPE)} introduction two blocks on one row`,
-  )
+  if (wanted('login')) {
+    check(
+      'layout/landscape-split',
+      login.found && login.split,
+      `@ ${at(LANDSCAPE)} login two blocks on one row`,
+    )
+  }
+  if (wanted('introduction')) {
+    check(
+      'layout/landscape-split',
+      introduction.found && introduction.split,
+      `@ ${at(LANDSCAPE)} introduction two blocks on one row`,
+    )
+  }
 }
 
 await browser.close()
