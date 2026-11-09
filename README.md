@@ -257,9 +257,6 @@ a carousel library, so the animation stays interruptible mid-swipe.
   (needs a dev server on :5173).
 - `bun run brand:shots` — captures the same screens under every brand preset and writes a
   contact sheet to `SHOT_DIR/index.html` (default `shots/brand`).
-- `bun run layout:check` — the wide-viewport guard: measures the sign-in, introduction and
-  profile columns at desktop, phone and short-landscape sizes and fails when a surface stretches
-  past its 42rem reading measure (needs a dev server on :5173, or point it with `BASE_URL=`).
 - `bun run smoke` — end-to-end check: sign in, capture, read the report, ask a question, confirm
   it reached history. Point it anywhere with `BASE_URL=https://nekibuki.thecrafter.io`.
 - `bun run perf` — the performance guard: the photo pipeline runs in the worker, the camera

@@ -60,11 +60,11 @@ const check = (id, ok, detail = '') => {
 const round = (value) => Math.round(value * 10) / 10
 const at = ([width, height]) => `${width}×${height}`
 
-/** The demo session the app writes itself in mock mode. */
+/** The demo session the app writes itself in mock mode; the email line is a plain marker, not an address. */
 const DEMO_USER = {
   id: 'demo-traveller',
   name: 'Nekibuki',
-  email: 'traveller@nekibuki.app',
+  email: 'demo-account',
   avatarUrl: null,
   provider: 'demo',
 }
@@ -115,13 +115,13 @@ async function seed(page, onboarded) {
  * window (a classic scrollbar must not be read as an off-centre column).
  */
 function measure(page, surface) {
-  return page.evaluate((surface) => {
+  return page.evaluate(({ surface, marker }) => {
     const roots = {
       login: () => document.querySelector('main'),
       introduction: () => document.querySelector('header')?.parentElement ?? null,
       profile: () =>
         Array.from(document.querySelectorAll('section')).find((element) =>
-          element.textContent?.includes('@nekibuki.app'),
+          element.textContent?.includes(marker),
         ) ?? null,
     }
 
@@ -186,7 +186,7 @@ function measure(page, surface) {
       headingLeft: heading ? heading.getBoundingClientRect().left : null,
       split: hasSplit(),
     }
-  }, surface)
+  }, { surface, marker: DEMO_USER.email })
 }
 
 const widest = (columns) => [...columns].sort((a, b) => b.width - a.width)[0] ?? null
@@ -243,9 +243,9 @@ async function visit(page, [width, height]) {
   await page.getByText(DEMO_USER.email).waitFor()
   // The deck slides the panel in at a smaller scale; wait until its column has
   // stopped changing width, then measure the settled surface.
-  await page.waitForFunction(() => {
+  await page.waitForFunction((marker) => {
     const section = Array.from(document.querySelectorAll('section')).find((element) =>
-      element.textContent?.includes('@nekibuki.app'),
+      element.textContent?.includes(marker),
     )
     const column = section?.querySelector('.mx-auto')
     if (!column) return false
@@ -253,7 +253,7 @@ async function visit(page, [width, height]) {
     const previous = window.__settledWidth
     window.__settledWidth = width
     return typeof previous === 'number' && Math.abs(previous - width) < 0.5
-  })
+  }, DEMO_USER.email)
   const profile = await measure(page, 'profile')
 
   return { login, introduction, profile }
