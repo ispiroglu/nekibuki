@@ -290,7 +290,7 @@ const sidePadding = (styles: Styles): [number, number] => {
   return [px(styles['padding-left']), px(styles['padding-right'])]
 }
 
-/** The width a browser gives an element's border box in this model: block fill, capped by max-width. */
+/** The width a browser gives an element's border box in this model: declared width, block fill, caps and floors. */
 export function boxWidth(el: El, viewport: Viewport, engine: Engine): number {
   const parent = el.parent
   if (!parent || parent.tag === '#root') return viewport.width
@@ -298,8 +298,21 @@ export function boxWidth(el: El, viewport: Viewport, engine: Engine): number {
   const [padLeft, padRight] = sidePadding(parentStyles)
   const parentContent = boxWidth(parent, viewport, engine) - padLeft - padRight
   const styles = stylesOf(el, viewport, engine)
+
+  // An explicit width (w-24, w-[900px], w-1/2) or a min-width can make a box wider than its parent:
+  // that is how a layout overflows, so the model resolves them instead of assuming a block fill.
+  let width = parentContent
+  const declared = styles['width']
+  if (declared !== undefined && declared !== 'auto') {
+    const percent = declared.match(/^([\d.]+)%$/)
+    const fixed = lengthToPx(declared)
+    if (percent) width = (parentContent * Number(percent[1])) / 100
+    else if (fixed !== null) width = fixed
+  }
+  const min = styles['min-width'] !== undefined ? lengthToPx(styles['min-width']) : null
+  if (min !== null) width = Math.max(width, min)
   const cap = styles['max-width'] !== undefined && styles['max-width'] !== 'none' ? lengthToPx(styles['max-width']) : null
-  return cap === null ? parentContent : Math.min(parentContent, cap)
+  return cap === null ? width : Math.min(width, cap)
 }
 
 export interface Column {
@@ -308,6 +321,7 @@ export interface Column {
   leftMargin: number
   rightMargin: number
   gutter: number
+  gutterRight: number
 }
 
 /** Measure a column inside its containing block, with the auto margins the browser resolves. */
@@ -319,13 +333,33 @@ export function measureColumn(el: El, viewport: Viewport, engine: Engine): Colum
   const parentWidth = boxWidth(parent, viewport, engine) - padLeft - padRight
   const width = boxWidth(el, viewport, engine)
   const styles = stylesOf(el, viewport, engine)
-  const auto = (styles['margin-inline'] ?? '').includes('auto')
-  const left = auto ? (parentWidth - width) / 2 : px(styles['margin-left'])
-  const right = auto ? (parentWidth - width) / 2 : px(styles['margin-right'])
+  // The browser distributes the leftover space only to the auto sides: both auto splits it, one auto
+  // takes all of it (so `ml-auto` right-aligns and `mr-auto` left-aligns), none leaves it on the right.
+  const inline = splitTokens(styles['margin-inline'] ?? '')
+  const leftDecl = styles['margin-left'] ?? inline[0] ?? '0px'
+  const rightDecl = styles['margin-right'] ?? inline[1] ?? inline[0] ?? '0px'
+  const remaining = parentWidth - width
+  const leftAuto = leftDecl === 'auto'
+  const rightAuto = rightDecl === 'auto'
+  let left: number
+  let right: number
+  if (leftAuto && rightAuto) {
+    left = remaining / 2
+    right = remaining / 2
+  } else if (leftAuto) {
+    right = px(rightDecl)
+    left = remaining - right
+  } else if (rightAuto) {
+    left = px(leftDecl)
+    right = remaining - left
+  } else {
+    left = px(leftDecl)
+    right = remaining - left
+  }
   let surface = el
   while (surface.parent && surface.parent.tag !== '#root') surface = surface.parent
-  const [gutter] = sidePadding(stylesOf(surface, viewport, engine))
-  return { width, parentWidth, leftMargin: left, rightMargin: right, gutter }
+  const [gutter, gutterRight] = sidePadding(stylesOf(surface, viewport, engine))
+  return { width, parentWidth, leftMargin: left, rightMargin: right, gutter, gutterRight }
 }
 
 /** Whether an element paints a box; `display: contents` elements hand their children to the parent. */
@@ -437,7 +471,9 @@ export function placeChildren(container: El, viewport: Viewport, engine: Engine)
 
   const stack = !display.includes('flex') || (styles['flex-direction'] ?? '').includes('column')
   if (stack) {
-    children.forEach((child, index) => placements.set(child, { x: 0, y: index, width: available, row: index }))
+    children.forEach((child, index) =>
+      placements.set(child, { x: 0, y: index, width: boxWidth(child, viewport, engine), row: index }),
+    )
     return placements
   }
 
@@ -458,6 +494,27 @@ export function placeChildren(container: El, viewport: Viewport, engine: Engine)
     x += widths[index] + gap
   })
   return placements
+}
+
+/**
+ * The widest right edge any laid-out box reaches, in page coordinates: the model's scroll width.
+ *
+ * A box wider than its parent (an explicit width, a min-width, a grid track wider than the
+ * container) pushes this past the viewport, which is exactly the horizontal overflow a phone
+ * viewport must not have. Text lines are not measured; the surfaces under test wrap their text.
+ */
+export function documentScrollWidth(surface: El, viewport: Viewport, engine: Engine): number {
+  const [padLeft] = sidePadding(stylesOf(surface, viewport, engine))
+  let widest = boxWidth(surface, viewport, engine)
+  const walk = (node: El, originX: number) => {
+    for (const [child, box] of placeChildren(node, viewport, engine)) {
+      const [childPadLeft] = sidePadding(stylesOf(child, viewport, engine))
+      widest = Math.max(widest, originX + box.x + box.width)
+      walk(child, originX + box.x + childPadLeft)
+    }
+  }
+  walk(surface, padLeft)
+  return widest
 }
 
 /** The classes every element across the given rendered trees emits. */
