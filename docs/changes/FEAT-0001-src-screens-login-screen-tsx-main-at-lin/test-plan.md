@@ -23,7 +23,8 @@ camera and report surfaces, and every viewport not listed here.
   `bun run layout:check`: Playwright (Chromium) against the Vite dev server of this worktree
   (`bun run dev:web`, `BASE_URL` default `http://localhost:5173`). One case per viewport, each
   case emitting a pass/fail line. This is S1's test for a behaviour change (AGENTS.md) and the
-  only check that can fail on the base commit for the wide-width defects.
+  only check that can fail on the base commit for the wide-width defects. It runs whole or per
+  surface; see [Running the layout check](#running-the-layout-check).
 - **Build gates** — `bun test` and `bun run typecheck` in the worktree. No browser needed.
 - The sign-in and introduction surfaces need no credentials: the login surface is public, and
   the introduction is reached by the check's seeded local session (`localStorage` seed written by
@@ -53,6 +54,52 @@ the camera.
 | AC-2.4 Introduction phone-width and landscape unchanged | S2 | APP-REQ-NEW-5 | `layout/phone-gutters-no-overflow`, `layout/landscape-split` |
 | AC-2.5 Build gates and console clean | S2 | APP-REQ-NEW-6 | `gate/typecheck-and-tests` |
 
+## Running the layout check
+
+The check is one instrument shared by both Stories, so it takes surface names:
+
+```
+bun run dev:web                      # dev server on :5173, in another terminal
+bun run layout:check                 # every surface — the whole-feature gate
+bun run layout:check login           # the sign-in surface's cases (AC-1.1 to AC-1.4)
+bun run layout:check introduction    # the introduction's cases (AC-2.1 to AC-2.4)
+bun run layout:check profile         # the profile reference surface alone
+bun run layout:check login profile   # several surfaces at once
+```
+
+The surface names are `login`, `introduction` and `profile`; an unknown name exits 2 with the
+list. Point the check at another origin with `BASE_URL=https://nekibuki.thecrafter.io`.
+
+Exit codes: `0` every reported case passed, `1` at least one case failed, `2` bad surface name.
+With no surface named, every case in the table below runs, which is the gate the whole feature
+must pass on `main` after S1 and S2 merge.
+
+What it measures, per surface:
+
+- `login` — the centred column at 1280×800, 1024×768 and 1440×900 (≤768px, equal margins within
+  2px, width within 1px of the profile column); the 20px phone gutter and the no-horizontal-
+  overflow bound at 390×844, 360×640 and 320×568; the two-column split at 844×390.
+- `introduction` — the same wide-column, phone-gutter and landscape cases for the welcome
+  header, slide area and footer column.
+- `profile` — the same wide-column and phone-gutter cases for the reference surface, whose
+  column must keep its base-commit 672px measure.
+
+`gate/no-console-errors` always runs: no console error and no uncaught page error on the way
+through sign-in, introduction and profile.
+
+Branch state while the change is in flight:
+
+- On the base commit `ae51078c39d91dff3be39f142e0ccdcc4a6dea8b`, `bun run layout:check login`
+  exits 1 on `layout/login-wide-column` (the column is full width), so the case proves the
+  defect before it proves the fix.
+- On S1's branch the same command exits 0: the sign-in column measures 672px with equal left and
+  right margins at all three wide viewports, matches the profile column within 1px, keeps the
+  20px phone gutter and the landscape split.
+- `bun run layout:check` with no surface name still exits 1 on S1's branch, on
+  `layout/onboarding-wide-column` only: the introduction is S2's file and outside S1's scope. The
+  whole-feature run goes green when S2's introduction change and the other wide-width surfaces
+  land; until then a Story runs the surface it owns.
+
 ## Test cases
 
 - `layout/login-wide-column` — at 1280×800, 1024×768 and 1440×900, measure the login content
@@ -70,9 +117,10 @@ the camera.
 - `onboarding/three-slides-preserved` — the introduction reports exactly three steps in its
   `Onboarding steps` group, and the rendered title and body text of each step equals the text
   captured from the base commit.
-- `layout/check-fails-on-base-commit` — the check run against commit
-  `ae51078c39d91dff3be39f142e0ccdcc4a6dea8b` exits non-zero on `layout/login-wide-column` and
-  `layout/onboarding-wide-column`, and exits zero on the change branch. Recorded once in the
-  implementation pull request transcript.
+- `layout/check-fails-on-base-commit` — `bun run layout:check login` against commit
+  `ae51078c39d91dff3be39f142e0ccdcc4a6dea8b` exits non-zero on `layout/login-wide-column`, and
+  exits zero on S1's branch; the same check for the introduction
+  (`bun run layout:check introduction`) exits non-zero on the base commit and zero once S2 lands.
+  Recorded once in the implementation pull request transcript.
 - `gate/typecheck-and-tests` — `bun run typecheck` exits 0, `bun test` exits 0, and the check
   collects zero console errors on the three surfaces.
