@@ -163,7 +163,7 @@ export function OnboardingScreen() {
 
   return (
     <div className="flex min-h-dvh flex-col overflow-x-hidden bg-background">
-      <header className="flex shrink-0 items-center justify-between gap-3 px-5 py-1 safe-top sm:px-6">
+      <header className="mx-auto flex w-full max-w-2xl shrink-0 items-center justify-between gap-3 px-5 py-1 safe-top sm:px-6">
         <p className="display flex min-w-0 items-baseline text-value text-brand-ink">
           <span className="shrink-0">{t('Welcome,', 'Hoş geldin,')}&nbsp;</span>
           <span className="min-w-0 truncate" title={fullName}>
@@ -191,7 +191,7 @@ export function OnboardingScreen() {
           if (info.offset.x < -70 || info.velocity.x < -520) go(index + 1)
           else if (info.offset.x > 70 || info.velocity.x > 520) go(index - 1)
         }}
-        className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pb-2 no-scrollbar sm:px-6"
+        className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col overflow-y-auto px-5 pb-2 no-scrollbar sm:px-6"
       >
         <AnimatePresence mode="wait" initial={false} custom={direction}>
           <motion.div
@@ -218,7 +218,7 @@ export function OnboardingScreen() {
         </AnimatePresence>
       </motion.div>
 
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-3 px-5 pt-2 safe-bottom sm:px-6">
+      <div className="mx-auto flex w-full max-w-2xl shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-3 px-5 pt-2 safe-bottom sm:px-6">
         <div className="flex items-center gap-1" role="group" aria-label={t('Onboarding steps', 'Tanıtım adımları')}>
           {slides.map((item, dotIndex) => (
             <button
