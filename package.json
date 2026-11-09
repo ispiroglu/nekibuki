@@ -15,6 +15,7 @@
     "typecheck": "wrangler types && tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.worker.json && tsc --noEmit -p tsconfig.node.json",
     "icons": "bun scripts/generate-icons.mjs",
     "shots": "bun scripts/screenshot.mjs",
+    "layout:check": "bun scripts/layout-check.mjs",
     "brand:shots": "bun scripts/brand-shots.mjs",
     "test": "bun test",
     "smoke": "bun scripts/smoke.mjs",

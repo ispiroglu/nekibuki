@@ -122,88 +122,94 @@ export function LoginScreen() {
 
   return (
     <main className="flex min-h-dvh flex-col bg-background px-5 safe-top safe-bottom sm:px-6 [@media(orientation:landscape)_and_(max-height:560px)]:grid [@media(orientation:landscape)_and_(max-height:560px)]:grid-cols-[1.05fr_0.95fr] [@media(orientation:landscape)_and_(max-height:560px)]:items-center [@media(orientation:landscape)_and_(max-height:560px)]:gap-10">
-      <motion.div
-        initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={spring}
-        className="flex flex-1 flex-col justify-center"
+      {/* Only this column wrapper is new: both motion.div blocks below keep the base commit's entrance animation. */}
+      <div
+        data-layout-column="login"
+        className="mx-auto flex w-full max-w-2xl flex-1 flex-col [@media(orientation:landscape)_and_(max-height:560px)]:contents"
       >
-        <p className="display text-lg text-brand-ink">Nekibuki</p>
-        <Logo className="mt-5 size-16 text-foreground sm:mt-6 sm:size-20 [@media(orientation:landscape)_and_(max-height:560px)]:mt-3 [@media(orientation:landscape)_and_(max-height:560px)]:size-12 [@media(max-height:360px)]:hidden" draw={!reduceMotion} />
-        <h1 className="display mt-7 text-[clamp(2.25rem,12vw,3.25rem)] font-medium sm:mt-10 [@media(orientation:landscape)_and_(max-height:560px)]:mt-4 [@media(orientation:landscape)_and_(max-height:560px)]:text-4xl [@media(max-height:360px)]:mt-3">
-          {language === 'tr' ? (
-            <>
-              Yanından geçip gittiğin yerler için{' '}
-              <em className="not-italic text-brand-ink">sakin bir rehber</em>.
-            </>
-          ) : (
-            <>
-              A quiet guide for the places you{' '}
-              <em className="not-italic text-brand-ink">walk past</em>.
-            </>
-          )}
-        </h1>
-        <p className="mt-4 max-w-xs text-base leading-relaxed text-muted-foreground sm:mt-5 sm:text-lg [@media(orientation:landscape)_and_(max-height:560px)]:mt-4 [@media(orientation:landscape)_and_(max-height:560px)]:max-w-none [@media(orientation:landscape)_and_(max-height:560px)]:text-base [@media(orientation:landscape)_and_(max-height:560px)]:leading-6 [@media(max-height:360px)]:mt-3 [@media(max-height:360px)]:leading-snug">
-          {t(
-            'Point your camera at a monument, a landscape or a corner of a city. Nekibuki tells you what it is, what to look at, and four things worth remembering.',
-            'Kameranı bir anıta, manzaraya ya da şehrin bir köşesine tut. Nekibuki ne olduğunu, neye bakman gerektiğini ve hatırlamaya değer dört şeyi anlatır.',
-          )}
-        </p>
-      </motion.div>
-
-      <motion.div
-        initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ ...spring, delay: 0.06 }}
-        className="pb-2 [@media(orientation:landscape)_and_(max-height:560px)]:py-4"
-      >
-        {failure && (
-          <div role="alert" className="mb-4 rounded-2xl bg-secondary px-4 py-3">
-            <p className="text-sm font-medium text-foreground">{failure.title}</p>
-            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{failure.hint}</p>
-          </div>
-        )}
-
-        <button
-          type="button"
-          disabled={busy}
-          aria-busy={busy}
-          onClick={async () => {
-            setPending(true)
-            try {
-              await signIn()
-            } finally {
-              setPending(false)
-            }
-          }}
-          className="flex h-14 w-full items-center justify-center gap-3 rounded-full bg-primary px-5 text-base font-medium text-primary-foreground transition-transform duration-150 ease-out active:scale-[0.98] disabled:opacity-80 motion-reduce:transition-none motion-reduce:active:scale-100"
+        <motion.div
+          initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={spring}
+          className="flex flex-1 flex-col justify-center"
         >
-          {busy ? (
-            <>
-              <Loader2 aria-hidden className="size-5 animate-spin motion-reduce:animate-none" />
-              {t('Signing you in…', 'Giriş yapılıyor…')}
-            </>
-          ) : (
-            <>
-              <GoogleMark className="size-5" />
-              {failure ? t('Try Google again', 'Google ile tekrar dene') : t('Continue with Google', 'Google ile devam et')}
-            </>
-          )}
-        </button>
+          <p className="display text-lg text-brand-ink">Nekibuki</p>
+          <Logo className="mt-5 size-16 text-foreground sm:mt-6 sm:size-20 [@media(orientation:landscape)_and_(max-height:560px)]:mt-3 [@media(orientation:landscape)_and_(max-height:560px)]:size-12 [@media(max-height:360px)]:hidden" draw={!reduceMotion} />
+          <h1 className="display mt-7 text-[clamp(2.25rem,12vw,3.25rem)] font-medium sm:mt-10 [@media(orientation:landscape)_and_(max-height:560px)]:mt-4 [@media(orientation:landscape)_and_(max-height:560px)]:text-4xl [@media(max-height:360px)]:mt-3">
+            {language === 'tr' ? (
+              <>
+                Yanından geçip gittiğin yerler için{' '}
+                <em className="not-italic text-brand-ink">sakin bir rehber</em>.
+              </>
+            ) : (
+              <>
+                A quiet guide for the places you{' '}
+                <em className="not-italic text-brand-ink">walk past</em>.
+              </>
+            )}
+          </h1>
+          <p className="mt-4 max-w-xs text-base leading-relaxed text-muted-foreground sm:mt-5 sm:text-lg [@media(orientation:landscape)_and_(max-height:560px)]:mt-4 [@media(orientation:landscape)_and_(max-height:560px)]:max-w-none [@media(orientation:landscape)_and_(max-height:560px)]:text-base [@media(orientation:landscape)_and_(max-height:560px)]:leading-6 [@media(max-height:360px)]:mt-3 [@media(max-height:360px)]:leading-snug">
+            {t(
+              'Point your camera at a monument, a landscape or a corner of a city. Nekibuki tells you what it is, what to look at, and four things worth remembering.',
+              'Kameranı bir anıta, manzaraya ya da şehrin bir köşesine tut. Nekibuki ne olduğunu, neye bakman gerektiğini ve hatırlamaya değer dört şeyi anlatır.',
+            )}
+          </p>
+        </motion.div>
 
-        <p className="mt-4 text-center text-xs text-muted-foreground">
-          {t('By continuing you agree to our', 'Devam ederek şunları kabul etmiş olursun:')}{' '}
-          <Link to="/terms" className={LINK}>
-            {t('Terms', 'Koşullar')}
-          </Link>{' '}
-          {t('and', 've')}{' '}
-          <Link to="/privacy" className={LINK}>
-            {t('Privacy Policy', 'Gizlilik Politikası')}
-          </Link>
-          .
-          {mode === 'mock' && t(' Demo mode — no Google account is contacted.', ' Demo modu — hiçbir Google hesabına bağlanılmaz.')}
-        </p>
-      </motion.div>
+        <motion.div
+          initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ ...spring, delay: 0.06 }}
+          className="pb-2 [@media(orientation:landscape)_and_(max-height:560px)]:py-4"
+        >
+          {failure && (
+            <div role="alert" className="mb-4 rounded-2xl bg-secondary px-4 py-3">
+              <p className="text-sm font-medium text-foreground">{failure.title}</p>
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{failure.hint}</p>
+            </div>
+          )}
+
+          <button
+            type="button"
+            disabled={busy}
+            aria-busy={busy}
+            onClick={async () => {
+              setPending(true)
+              try {
+                await signIn()
+              } finally {
+                setPending(false)
+              }
+            }}
+            className="flex h-14 w-full items-center justify-center gap-3 rounded-full bg-primary px-5 text-base font-medium text-primary-foreground transition-transform duration-150 ease-out active:scale-[0.98] disabled:opacity-80 motion-reduce:transition-none motion-reduce:active:scale-100"
+          >
+            {busy ? (
+              <>
+                <Loader2 aria-hidden className="size-5 animate-spin motion-reduce:animate-none" />
+                {t('Signing you in…', 'Giriş yapılıyor…')}
+              </>
+            ) : (
+              <>
+                <GoogleMark className="size-5" />
+                {failure ? t('Try Google again', 'Google ile tekrar dene') : t('Continue with Google', 'Google ile devam et')}
+              </>
+            )}
+          </button>
+
+          <p className="mt-4 text-center text-xs text-muted-foreground">
+            {t('By continuing you agree to our', 'Devam ederek şunları kabul etmiş olursun:')}{' '}
+            <Link to="/terms" className={LINK}>
+              {t('Terms', 'Koşullar')}
+            </Link>{' '}
+            {t('and', 've')}{' '}
+            <Link to="/privacy" className={LINK}>
+              {t('Privacy Policy', 'Gizlilik Politikası')}
+            </Link>
+            .
+            {mode === 'mock' && t(' Demo mode — no Google account is contacted.', ' Demo modu — hiçbir Google hesabına bağlanılmaz.')}
+          </p>
+        </motion.div>
+      </div>
     </main>
   )
 }
