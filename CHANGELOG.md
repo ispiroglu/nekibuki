@@ -3,6 +3,10 @@
 Notable changes to Nekibuki, newest first. This is a product changelog, not a
 commit log; the git history has the details.
 
+## 2026-11-09 — Reading-measure change folded into the living spec
+
+- FEAT-0001's reading-measure requirements now live in the app behaviour, domain-model and glossary documents as APP-REQ-001 to APP-REQ-006, and the change spec is archived; the product itself does not change with this release.
+
 ## 2026-11-09 — Centred sign-in at wide widths
 
 - The sign-in surface now centres its copy and action blocks in the same 42rem column as the profile screen at 1024px and wider, with its fade-and-slide entrance animation, the 20px phone gutters and the short-landscape split layout unchanged.
