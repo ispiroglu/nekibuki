@@ -10,7 +10,7 @@ main_branch: main
 sandbox: seatbelt
 runtime:
   agent: pi
-  model: opencode-go/deepseek-v4.1-flash:high
+  model: mistral/zai-glm-5-3-flash:high
 adapters:
   project_management: github
   repository: github
